@@ -1,6 +1,6 @@
 # LUMEN — residual semantic and UX lattice (2026-10-08)
 
-Canonical baseline: UX-S1 and UX-S2 merged; UX-S3 implemented in PR #13 from main c5c9374c1eb5243f7fc01078ddf482d974e607c3. This document **does not assert** live Render/Koha/IdP/device/2,000-concurrent certification.
+Canonical baseline: UX-S1 and UX-S2 merged; UX-S3 merged; UX-S4 measured compression in progress from main 9f8da5ad6500c1a732b0efb93307adb5b90387ed. This document **does not assert** live Render/Koha/IdP/device/2,000-concurrent certification.
 
 ## Product intent: minimum code, maximum understandable action
 
@@ -21,9 +21,9 @@ MERGED baseline (R1–R9b)
           |
      UX-S2 non-authoritative projection and action contracts    [merged]
           |
-     UX-S3 role/task IA and progressive-disclosure recomposition [PR #13]
+     UX-S3 role/task IA and progressive-disclosure recomposition [merged]
           |
-     UX-S4 visual compression and responsive density budgets
+     UX-S4 visual compression and responsive density budgets [PR #14]
           |
      UX-S5 end-to-end CTA, accessibility and interaction clarity
           |
@@ -110,3 +110,7 @@ For a projection `P`, use only `P(data, source, featureFlags, role)` to produce 
 - **Enterprise ILS**: 2,000 concurrent **realistic mixed authenticated** users with tail latency, saturation/fault tests, scaling/DR decisions; security/privacy/WCAG signoff and evidence register (R12/R13 open).
 
 No PR count, screenshot quality, or green mock CI alone qualifies LUMEN as enterprise ILS.
+
+### UX-S4 measurement protocol
+
+Measure computed CSS bounding boxes in real Chromium across desktop 1440×900, Android 393×851 and narrow 320×700 (each at 100% default root font). Hero height ≤240 desktop / ≤180 mobile, decorative cover ≤64×88, metric card ≤112 at default font scale, no viewport overflow, visible navigation and no loss of text at root font-size 200%. Tap-target preference ≥44×44 for actionable buttons/links in primary task flows. These are **LUMEN budgets**, not WCAG numeric thresholds. Do not set max-height to make a budget pass by clipping content. Browser test evidence is commit-bound; physical devices and WCAG manual audits remain open.
