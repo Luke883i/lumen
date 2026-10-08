@@ -45,3 +45,24 @@ export function localHoldResult(receipt){
  if(receipt?.status==='queued')return {status:'queued',epistemic:'supported',message:'Prenotazione in coda. Segui gli aggiornamenti nella tua area.'};
  return {status:'unknown',epistemic:'unknown',message:'Esito da verificare. Controlla la tua area prima di riprovare.'};
 }
+
+/** Standalone statuses only; unknown statuses are never presented as successful. */
+export function localStatus(domain,status){
+ const maps={
+  loan:{active:'In prestito',returned:'Restituito'},
+  hold:{queued:'In coda',ready:'Pronto al ritiro',fulfilled:'Consegnata',cancelled:'Annullata'},
+  suggestion:{pending:'In valutazione',approved:'Approvata',rejected:'Non accolta',ordered:'Ordinata'}
+ };
+ const label=maps[domain]?.[status];
+ return Object.freeze(label?{label,epistemic:'supported'}:{label:'Stato da verificare',epistemic:'unknown'});
+}
+/** Successful local mutation transport is not automatically proof of downstream delivery. */
+export function localActionFeedback(action){
+ const messages={
+  book:'Titolo aggiunto al catalogo LUMEN.',
+  user:'Account creato. Comunica le credenziali con un canale sicuro.',
+  checkout:'Prestito registrato nel catalogo LUMEN.',
+  broadcast:'Comunicazione inserita nella casella avvisi dei destinatari.'
+ };
+ return messages[action]||null;
+}
