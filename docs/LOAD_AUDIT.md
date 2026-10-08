@@ -16,3 +16,7 @@ L5: verified identity OIDC, staff impersonation safeguards, API security review,
 L6: Koha live integration K2-K5 and upgrades rehearsed.
 
 Render SQLite persistent disk permits only one instance and no zero-downtime deployment, so architectural promotion to managed PostgreSQL or a managed Koha cluster will be required if the bottleneck or HA objective demands horizontal scale. See https://render.com/docs/disks .
+
+## Independent write-mutation saturation
+
+The same workflow includes the `write-2000` job. It seeds 2,000 patrons, makes one hold per user and replays every request with the same idempotency key. One in 20 patrons requests the same title, exercising ready/queued capacity semantics. The post-run `scripts/audit-load.mjs` checks: exact 2,000 holds and 2,000 receipts; 1,900 ready, 100 queued; no duplicated active holds, overallocated titles or orphan records; SQLite quick_check ok. This is a synthetic mutation audit, **not** a production-equivalent soak test.

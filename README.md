@@ -19,7 +19,7 @@ Demonstration data is **enabled only** when `LUMEN_DEMO=1` and `NODE_ENV` is not
 
 Connect the repo to a Render Blueprint (`render.yaml`). Render provisions a Node service and a **persistent disk** (billable). Set `ADMIN_EMAIL`, `ADMIN_PASSWORD` and optionally `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. The service uses `/var/data/lumen.sqlite`; never run production on Render's ephemeral filesystem. Seed only one librarian account from `ADMIN_*` on the first start. Add books, copies and patrons from the librarian interface.
 
-`bash scripts/bootstrap.sh` verifies the environment and installs dependencies, `npm run start` runs the server, `npm test` runs deterministic domain/API tests, `npm run check` checks JS syntax. A health endpoint is available at `/api/health`.
+`bash scripts/bootstrap.sh` verifies the environment and installs dependencies, `npm run preflight` checks the local release prerequisites, `npm run start` runs the server, `npm test` runs deterministic domain/API tests, `npm run check` checks JS syntax. A health endpoint is available at `/api/health`.
 
 ## Koha read-only catalogue bridge
 
@@ -38,7 +38,7 @@ The separate [k6 workflow](.github/workflows/load-audit.yml) tests 2,000 synthet
 - **Web Push**: optional, activated only with VAPID keys; notifications are always persisted in the in-app inbox. Browser permission and subscription are user-controlled.
 - **Email**: not part of this version; no claim of delivery is made.
 
-See [product contracts](docs/CONTRACTS.md), [state-space audit](docs/STATE_SPACE.md), [operations](docs/OPERATIONS.md) and [architecture decisions](docs/DECISIONS.md).
+See [release gates and exact scope](docs/RELEASE_GATES.md), [product contracts](docs/CONTRACTS.md), [state-space audit](docs/STATE_SPACE.md), [operations](docs/OPERATIONS.md) and [architecture decisions](docs/DECISIONS.md).
 
 ## Deploy & security checklist
 
