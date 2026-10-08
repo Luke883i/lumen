@@ -17,7 +17,9 @@ export function makeKoha(config=process.env,transport=fetch){
   if(url.pathname!=='/' && url.pathname!=='') throw new KohaError('KOHA_CONFIGURATION','Indica KOHA_BASE_URL senza /api/v1',500);
   let bearer='',expires=0,refresh=null;
   async function request(path,{method='GET',headers={},body}={}){
-    const response=await transport(root+path,{method,headers,body,redirect:'error',signal:AbortSignal.timeout(6500)});
+    let response;
+    try {response=await transport(root+path,{method,headers,body,redirect:'error',signal:AbortSignal.timeout(6500)});}
+    catch {throw new KohaError('KOHA_NETWORK','Impossibile raggiungere Koha');}
     if(!response.ok) throw new KohaError('KOHA_HTTP_'+response.status,'Servizio Koha indisponibile o permessi API insufficienti',response.status===404?404:503);
     try {return await response.json();}catch{throw new KohaError('KOHA_BAD_JSON','Risposta Koha non conforme');}
   }
