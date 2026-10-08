@@ -13,32 +13,32 @@
 - **Roles**: anonymous (discovery/access), student (search/holds/renewals/alerts), faculty (+ acquisitions), librarian (staff controls/reconciliation/broadcast). UI hiding is **not** authorization; backend RBAC remains mandatory.
 - **Institution-provided text**: never invent opening hours, branch names, contacts, loan durations or availability. Minimal semantic descriptions and configuration-needed language until the library supplies facts.
 
-## 2. Minimal dependency lattice
+## 2. Minimal dependency lattice (partial order, not a waterfall)
 
 ```text
-              R7 MERGED (Node 24, Codespaces, Render, SHA-bound canary)
-                                |
-                    R8 UI + PWA (this PR)
-                       /                 \
-             R9 browser E2E        R9b Push hardening
-                       \                 /
-                        R10 Render canary + backup restore
-                         /                \
-             R11 Koha live         R11 IdP live
-                         \                /
-                      R12 security & 2000 load on target
-                                |
-                     R13 enterprise release signoff
+    R1–R7 MERGED / reproducible standalone PWA + optional Koha/OIDC contracts
+          |                |                      |
+      R8 UX/PWA         R10 Render live       R11 Koha + IdP live
+      /       \             |                      |
+  R9 browser  R9b push      |                      |
+      \       /             |                      |
+       R8–R11 complete with evidence for all four independent workstreams
+                             |
+                R12 2k load + HA/security/a11y
+                             |
+                   R13 enterprise signoff
 ```
+
+The workstreams are **parallel where they can be**: Render deployment verification (R10) depends on merged R7 and access to Render, **not** on Chrome cosmetic polish; live Koha/IdP acceptance (R11) depends on the existing R3–R6 integrations and staging access, **not** on R8; real-device UX (R9) and push lifecycle (R9b) depend on R8. Only certification R12 and final signoff R13 require all preceding evidence. This is the minimal dependency cut rather than an arbitrary chain of numbered PRs.
 
 - **R8 (now)**: branded global/intermediate/local design tokens, truthful Italian microcopy, action dialog, install-state machine and push preferences; static/unit tests. Mergeable independently of live services.
 - **R9 / R9b**: test actual Android Chrome installation, Windows Chrome window mode, Chrome notification permission and keyboard/focus through a real browser; test failure/offline/reload/error states; push subscription privacy and lifecycle regression.
-- **R10**: Render operator deploy through Blueprint, `EXPECTED_SHA=... npm run verify:remote -- https://...`, persisted-state restart, offsite encrypted backup and timed restore artifact (single-node pilot production operability).
+- **R10**: Render operator deploy through Blueprint, `EXPECTED_SHA=... npm run verify:remote -- https://...`, persisted-state restart, offsite encrypted backup and timed restore artifact (single-node pilot operability).
 - **R11**: live Koha circulation and institutional OIDC acceptance with real test fixtures, staff permissions, policy/refusal and revocation. Requires accounts, credentials and institutional approval; mock green does **not** satisfy.
 - **R12**: mixed 2,000 concurrent authenticated users against realistic Koha/Render targets (arrival rates, latency percentiles, queue depths, errors, resource saturation, recovery), HA/DR decision, accessibility, privacy and independent security signoff. SQLite/single instance may require architectural migration.
 - **R13**: complete gate matrix, signed evidence/owners, rollback and incident exercises, release decision. An enterprise label is forbidden while any mandatory gate is BLOCKED.
 
-**Minimal cuts:** R8+R9 yields a polished and reproducible *pilot*. R10 yields *operator-deployable production pilot*, not HA. R11+R12+R13 are necessary for substantiated *enterprise ILS* classification. These labels are evidence-based, not PR-count-based.
+**Minimal release cuts:** R7 alone yields a *reproducible standalone pilot*. R7+R8+R9/R9b yields a *polished installable pilot*. R7+R10 yields an *operator-validated Render pilot*. R9/R9b+R10+R11+R12+R13 are required for substantiated *enterprise ILS* classification. These labels are evidence-based, not PR-count-based.
 
 ## 3. UI ontology: global / intermediate / local
 

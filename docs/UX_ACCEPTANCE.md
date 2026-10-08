@@ -49,4 +49,4 @@ All observable claims must be supported by the server or real browser event. Chr
 
 ## Enterprise blockers after R8
 
-A green CI + this checklist does **not** prove: tested real Chrome behaviors (R9), real Render persistence/offsite backup restore (R10), production Koha and IdP interoperability (R11), 2,000 concurrent mixed load/HA/security/accessibility (R12), or the independent release signoff (R13).
+A green CI + this checklist does **not** prove: tested real Chrome behaviors (R9), real Render persistence/offsite backup restore (R10), independent live Koha and IdP interoperability (R11), 2,000 concurrent mixed load/HA/security/accessibility (R12), or the independent release signoff (R13).
