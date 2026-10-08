@@ -99,7 +99,7 @@ export function createOidc(s,env=process.env,provider=null){
         s.run('INSERT INTO sessions(token_hash,user_id,csrf,expires_at) VALUES(?,?,?,?)',tokenHash(token),binding.id,csrf,expiry);
         s.run('DELETE FROM sessions WHERE user_id=? AND token_hash NOT IN (SELECT token_hash FROM sessions WHERE user_id=? ORDER BY rowid DESC LIMIT 5)',binding.id,binding.id);
         s.run('INSERT INTO audit_events(actor_id,operation,request_hash,receipt_hash,idempotency_key,occurred_at) VALUES(?,?,?,?,?,?)',
-          binding.id,'oidc_login',digest({issuer:claims.iss,subject:claims.sub}),digest({userId:binding.id}),null,now());
+          binding.id,'oidc_login',digest(JSON.stringify({issuer:claims.iss,subject:claims.sub})),digest(JSON.stringify({userId:binding.id})),null,now());
       });
       return {token,user:{id:binding.id,name:binding.name,email:binding.email,role:binding.role},csrf};
     },
@@ -118,8 +118,8 @@ export function createOidc(s,env=process.env,provider=null){
         s.run('INSERT OR IGNORE INTO oidc_bindings(user_id,issuer,subject,linked_by,linked_at) VALUES(?,?,?,?,?)',
           user.id,settings.issuer.replace(/\/$/,''),subject,staff.id,now());
         s.run('INSERT INTO audit_events(actor_id,operation,request_hash,receipt_hash,idempotency_key,occurred_at) VALUES(?,?,?,?,?,?)',
-          staff.id,'oidc_bind',digest({issuer:settings.issuer,subject}),
-          digest({userId:user.id}),null,now());
+          staff.id,'oidc_bind',digest(JSON.stringify({issuer:settings.issuer,subject})),
+          digest(JSON.stringify({userId:user.id})),null,now());
         return {userId:user.id,linked:true};
       });
     }
