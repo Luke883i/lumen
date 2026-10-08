@@ -1,0 +1,52 @@
+name: BIME Security Assessment
+on:
+  push:
+    branches: [main, security/bime-r14-session-origin-hardening]
+    paths:
+      - 'src/**'
+      - 'scripts/security-mutations.mjs'
+      - 'test/security-*.test.mjs'
+      - 'package*.json'
+      - '.github/workflows/security-bime.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'scripts/security-mutations.mjs'
+      - 'test/security-*.test.mjs'
+      - 'package*.json'
+      - '.github/workflows/security-bime.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  invariant-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Static parse and all regression tests
+        run: npm run check && npm test
+      - name: 1,000,000 deterministic adversarial origin mutations
+        env:
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          set -o pipefail
+          npm run security:mutations 2>&1 | tee /tmp/lumen-bime-million.log
+      - name: Production dependency vulnerability gate (high/critical)
+        run: |
+          npm audit --omit=dev --audit-level=high --json > /tmp/lumen-bime-audit.json
+      - name: Preserve security evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumen-bime-${{ github.sha }}
+          path: |
+            /tmp/lumen-bime-million.log
+            /tmp/lumen-bime-audit.json
+          retention-days: 14
+          if-no-files-found: warn
