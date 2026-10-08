@@ -1,25 +1,46 @@
-# Operations
+# LUMEN operations and release runbook
 
-## Codespaces
-Open **Code → Codespaces → Create codespace**, wait for devcontainer dependencies, then `npm run dev`. Forward port 3000. Local data is in `data/lumen.sqlite`. To reset demo, stop the process and remove `data/lumen.sqlite*`.
+See [BOOT_DEPLOY.md](BOOT_DEPLOY.md) for the canonical reproducible Codespaces -> Render workflow.
 
-## Render
-Create a Blueprint from `render.yaml`. This uses a **billable** persistent disk and a single instance. Supply a strong `ADMIN_PASSWORD` (min. 12 characters) and `ADMIN_EMAIL`. `LUMEN_DEMO` must remain unset. `VAPID_*` are optional. Render uses auto-generated HTTPS.
+## Codespaces (development only)
 
-## State persistence and backup
-SQLite has WAL mode. Back up consistently using SQLite backup API or `VACUUM INTO` to separate mounted volume; **do not** copy an active main database without WAL coordination. Restore by stopping service, replacing the database with a validated snapshot, restarting and verifying health plus counts. This repo does not automate backups.
+Open a Codespace using the repository's Node 24 devcontainer (rebuild any pre-existing container), then run `npm run dev`. Only development has demo accounts. Keep forwarded port private. The `postCreateCommand` runs `bash scripts/bootstrap.sh`, which installs exact dependencies from package-lock.json.
+
+## Production Render (single-instance pilot)
+
+Create a Blueprint from `render.yaml`; enter `ADMIN_EMAIL` and `ADMIN_PASSWORD` as secrets. Node 24 is pinned by `.node-version`. `NODE_ENV=production`, `LUMEN_DEMO=0`, and `LUMEN_DB_PATH=/var/data/lumen.sqlite` are in the Blueprint. `npm start` invokes `prestart` and refuses invalid state before binding its HTTP port. The persistent disk is billable; only one service instance is possible and deploys briefly interrupt availability.
+
+## Validate
+
+```bash
+npm ci
+npm run check
+npm test
+npm run verify:deploy
+npm run verify:boot
+npm run preflight
+```
+
+These local/CI commands demonstrate a reproducible runtime; they do not provision a real Render service nor validate Koha, IdP or enterprise load.
+
+## Backups, restore and upgrade
+
+Use `npm run backup -- /var/data/backups/lumen-YYYYMMDD.sqlite` on the Render service instance. The Node SQLite online backup API includes concurrent WAL changes and generates a SHA-256 integrity manifest. Export backups **off the Render disk** to independent encrypted storage and test restore into a staging service before relying on recovery. Automatic remote backups, tested RPO/RTO, external retention and HA remain operator obligations.
+
+For rollback, use Render Deploys to select a previous code revision; **database schema migrations are not generally reversible**. Stop the service and restore a verified offsite snapshot when necessary, accounting for transactions after the snapshot.
 
 ## Web push
-Run `npx web-push generate-vapid-keys` locally; set PUBLIC/PRIVATE and SUBECT (mailto URI). Workers attempt pending delivery with retry. Inbox always remains authoritative. Delivery is best effort.
 
-## Upgrade
-Back up database; deploy commit SHA; startup migrates with `CREATE TABLE IF NOT EXISTS` currently (schema v1 only). Later schema changes require versioned migrations. One instance and disk mean maintenance windows may be needed.
+Configure `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` via Render's environment settings if needed. Generate keys with `npx web-push generate-vapid-keys`; do not store secrets in Git. The in-app inbox is authoritative; push delivery is best effort.
 
-## Limits
-No external ILS, no SSO, no MARC, no email. For 2,000 concurrent users: measure before sizing, and migrate to multi-instance/Postgres if the single-writer design saturates.
+## Koha and OIDC
 
-## Consistent SQLite backup (R2)
+Both integrations are disabled unless explicitly configured. Koha loans and check-ins are not production certified without a real Koha acceptance test. Institutional OIDC requires staged IdP subject binding and verified real login; do not enable `OIDC_ONLY=1` before a mapped active librarian has successfully signed in.
 
-Run `npm run backup -- /var/data/backups/lumen-YYYYMMDD.sqlite` from the service shell, with `LUMEN_DB_PATH` set. Uses Node's SQLite online backup API (WAL-consistent), opens the resulting image, runs PRAGMA integrity_check and writes a SHA-256 manifest next to the snapshot. **The backup must then be exported to separate storage with access control and tested restores**; a backup stored on the same disk is insufficient disaster recovery. Backup frequency, offsite copy and restore drills are currently operator obligations, not implemented automation.
+## Current architecture boundary
 
-Node 24's built-in SQLite API is at Release Candidate stability; do not claim enterprise DB maturity until verified for the chosen release.
+A Render persistent disk cannot be mounted on multiple instances and prevents zero-downtime deploys. This standalone topology must not be represented as production-ready enterprise capacity for 2,000 concurrent users; that gate requires an infrastructure and data-plane re-evaluation, realistic benchmark, DR/security and institutional signoff.
+
+## After-deploy read-only canary
+
+Run `EXPECTED_SHA=$(git rev-parse HEAD) npm run verify:remote -- https://your-service.onrender.com` from the revision deployed to Render. Requires a real Render HTTPS service; it checks `/api/health`, `/api/version`, PWA manifest and landing page, with strict SHA match.
