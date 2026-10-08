@@ -76,7 +76,7 @@ test('malformed endpoint and bogus browser keys cannot be registered',()=>{
  try{
   const bad=[
    {endpoint:'https://evil.example/test',keys},
-   {endpoint:'https://fcm.googleapis.com:443/test',keys},
+   {endpoint:'https://fcm.googleapis.com:444/test',keys},
    {endpoint:'https://fcm.googleapis.com/test#fragment',keys},
    {endpoint:endpoint('bad'),keys:{p256dh:'AA',auth:'BB'}},
    {endpoint:endpoint('bad'),keys:{p256dh:'!'.repeat(87),auth:keys.auth}}
