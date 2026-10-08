@@ -72,7 +72,7 @@ export function createService(s) {
   const api = {
     current(token) {
       if(!token) return null;
-      const row=s.get("SELECT u.id,u.name,u.email,u.role,u.active,ss.csrf FROM sessions ss JOIN users u ON u.id=ss.user_id WHERE ss.token_hash=? AND ss.expires_at>?",tokenHash(token),now());
+      const row=s.get("SELECT u.id,u.name,u.email,u.role,u.active,ss.csrf,ss.auth_method FROM sessions ss JOIN users u ON u.id=ss.user_id WHERE ss.token_hash=? AND ss.expires_at>?",tokenHash(token),now());
       return row || null;
     },
     login(email,password) {

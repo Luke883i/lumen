@@ -148,3 +148,14 @@ test('institutional IdP can require client_secret_basic without replacing OIDC l
  assert.equal(f.calls.authMethod.type,'basic');
  f.s.close();
 });
+
+test('database session auth origin distinguishes password and OIDC identities',async()=>{
+ const f=setup(),service=createService(f.s);
+ const local=service.login(f.student.email,'Demo1234!');
+ assert.equal(service.current(local.token).auth_method,'local');
+ f.oidc.bind(f.librarian,f.student.id,'subject-123');
+ const start=await f.oidc.start(),state=new URL(start.redirect).searchParams.get('state');
+ const oidc=await f.oidc.finish(start.flow,state,'code=test&state='+state);
+ assert.equal(service.current(oidc.token).auth_method,'oidc');
+ f.s.close();
+});

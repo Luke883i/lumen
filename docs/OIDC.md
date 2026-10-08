@@ -35,3 +35,7 @@ R6 stores only short-lived PKCE verifier, nonce and hashes of browser state/flow
 ## Institutional token client authentication
 
 Most providers accept `client_secret_post` (default). If your institutional IdP requires HTTP Basic authentication at the token endpoint, set `OIDC_TOKEN_AUTH_METHOD=client_secret_basic`. The allowlist rejects any other method and the same setting is exercised by `npm run oidc:smoke`; no support for public clients or unauthenticated tokens is claimed.
+
+## Session migration and SSO-only cutover
+
+On opening an existing SQLite database, LUMEN adds the `sessions.auth_method` column with default `local`; all legacy password sessions are classified as local. New institutional sessions use `oidc`. When `OIDC_ONLY=1`, even previously issued local session cookies are ignored by the HTTP handler for all protected APIs, while verified OIDC cookies remain valid. This resolves a cutover bypass that the older password-endpoint-only gate did not prevent. Rollout still requires controlled operator verification of one mapped active librarian before enabling the flag.

@@ -107,7 +107,10 @@ export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCircul
       }
       const idempotencyKey=req.headers['idempotency-key']||null;
       const token=cookieToken(req);
-      const user=api.current(token);
+      const rawUser=api.current(token);
+      // Enabling SSO-only invalidates old password-authenticated sessions
+      // without destroying independently authenticated OIDC sessions.
+      const user=oidcApi.only&&rawUser?.auth_method!=='oidc'?null:rawUser;
       if(method!=='GET'&&method!=='HEAD') {
         originGuard(req);
         if(path!=='/api/login') requireCsrf(req,user);

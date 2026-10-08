@@ -16,7 +16,7 @@ test('HTTP SSO: redirects and cookies remain server-bound, staff mapping CSRF an
  let calls=0;
  const issuer='https://institution.example.edu';
  const oidc=createOidc(store,{NODE_ENV:'test',OIDC_ISSUER:issuer,OIDC_CLIENT_ID:'test',
-   OIDC_CLIENT_SECRET:'not-a-real-secret',OIDC_REDIRECT_URI:'http://127.0.0.1:3000/api/auth/oidc/callback',OIDC_ONLY:'1'},{
+   OIDC_CLIENT_SECRET:'not-a-real-secret',OIDC_REDIRECT_URI:'http://127.0.0.1:3000/api/auth/oidc/callback',OIDC_ONLY:'0'},{
    randomPKCECodeVerifier:()=> 'verifier',
    calculatePKCECodeChallenge:async()=> 'challenge',
    discovery:async()=>({serverMetadata:()=>({issuer})}),
@@ -33,10 +33,10 @@ test('HTTP SSO: redirects and cookies remain server-bound, staff mapping CSRF an
  const base='http://127.0.0.1:'+server.address().port;
  try{
   const config=await (await fetch(base+'/api/config')).json();
-  assert.equal(config.identity.oidcEnabled,true);assert.equal(config.identity.oidcOnly,true);
+  assert.equal(config.identity.oidcEnabled,true);assert.equal(config.identity.oidcOnly,false);
   const pwd=await fetch(base+'/api/login',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},
     body:JSON.stringify({email:student.email,password:'Demo1234!'})});
-  assert.equal(pwd.status,403);
+  assert.equal(pwd.status,200);
   // For the test, staff binding is performed with a valid pre-existing librarian session.
   const existing=service.login(staff.email,'Demo1234!');
   const csrfHeaders={Origin:base,Cookie:'lumen_session='+encodeURIComponent(existing.token),
@@ -70,4 +70,30 @@ test('HTTP SSO: redirects and cookies remain server-bound, staff mapping CSRF an
  }finally{
   await new Promise(resolve=>server.close(resolve));store.close();
  }
+});
+
+test('SSO-only rejects all existing password sessions but accepts OIDC sessions',async()=>{
+ const store=openStore(':memory:');bootstrap(store,{NODE_ENV:'test',LUMEN_DEMO:'1'});
+ const service=createService(store);
+ const staff=store.get("SELECT * FROM users WHERE role='librarian'");
+ const login=service.login(staff.email,'Demo1234!');
+ const server=createServer(buildHandler({
+   api:service,database:store,oidcApi:{enabled:true,only:true}
+ }));
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const base='http://127.0.0.1:'+server.address().port;
+ try {
+   const cookie='lumen_session='+encodeURIComponent(login.token);
+   const me=await (await fetch(base+'/api/me',{headers:{Cookie:cookie}})).json();
+   assert.equal(me.user,null);
+   assert.equal((await fetch(base+'/api/staff/audit',{headers:{Cookie:cookie}})).status,401);
+   const password=await fetch(base+'/api/login',{method:'POST',
+     headers:{Origin:base,'Content-Type':'application/json'},
+     body:JSON.stringify({email:staff.email,password:'Demo1234!'})});
+   assert.equal(password.status,403);
+   store.run("UPDATE sessions SET auth_method='oidc' WHERE token_hash=?",
+     (await import('../src/store.mjs')).tokenHash(login.token));
+   const active=await (await fetch(base+'/api/me',{headers:{Cookie:cookie}})).json();
+   assert.equal(active.user.role,'librarian');
+ }finally{await new Promise(resolve=>server.close(resolve));store.close();}
 });

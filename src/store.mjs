@@ -23,7 +23,7 @@ const ddl = [
   "PRAGMA journal_mode = WAL",
   "PRAGMA busy_timeout = 5000",
   "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('student','faculty','librarian')), passhash TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), csrf TEXT NOT NULL, expires_at TEXT NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), csrf TEXT NOT NULL, expires_at TEXT NOT NULL, auth_method TEXT NOT NULL DEFAULT 'local' CHECK(auth_method IN ('local','oidc')))",
   "CREATE TABLE IF NOT EXISTS books (id TEXT PRIMARY KEY, title TEXT NOT NULL, author TEXT NOT NULL, isbn TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS copies (id TEXT PRIMARY KEY, book_id TEXT NOT NULL REFERENCES books(id), barcode TEXT UNIQUE NOT NULL, shelf TEXT NOT NULL DEFAULT '')",
   "CREATE TABLE IF NOT EXISTS holds (id TEXT PRIMARY KEY, book_id TEXT NOT NULL REFERENCES books(id), user_id TEXT NOT NULL REFERENCES users(id), status TEXT NOT NULL CHECK(status IN ('queued','ready','fulfilled','cancelled')), created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
@@ -80,6 +80,10 @@ export function openStore(path = './data/lumen.sqlite') {
   if (path !== ':memory:') mkdirSync(dirname(resolve(path)), { recursive: true });
   const db = new DatabaseSync(path);
   for (const sql of ddl) db.exec(sql);
+  // Existing R1–R5 databases predate the auth_method column.
+  // Migrate with a backward-compatible, explicit local default.
+  if(!db.prepare('PRAGMA table_info(sessions)').all().some(x=>x.name==='auth_method'))
+    db.exec("ALTER TABLE sessions ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'local' CHECK(auth_method IN ('local','oidc'))");
   if (!db.prepare("SELECT 1 FROM metadata WHERE key='catalog_fts_v1'").get()) {
     db.exec('BEGIN IMMEDIATE');
     try {
