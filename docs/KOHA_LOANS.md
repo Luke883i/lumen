@@ -46,3 +46,7 @@ GIT_SHA=$(git rev-parse HEAD) npm run koha:loans-smoke
 ```
 
 This probe performs GET requests only: patron loans, checkout ownership, renewal policy and checkout availability. It does not issue or renew an item. The IDs above are placeholders; supply real fixture IDs. No live Koha credentials were available in the repository CI, so this gate remains unverified.
+
+## R5 verified return handoff
+
+See [KOHA_RETURNS.md](KOHA_RETURNS.md). Koha operator performs the check-in; LUMEN only positively verifies the historical record and journals a receipt.
