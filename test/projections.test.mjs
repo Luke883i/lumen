@@ -89,13 +89,19 @@ test('ordered acquisition is not an acquired or delivered book',()=>{
 });
 test('inbox read status proves nothing about OS Web Push',()=>{
  for(const record of [{id:'id-a',read_at:null},{id:'id-b',read_at:'2026-10-08T09:00:00Z'},
-   {id:'id-c',read_at:undefined},{id:'id-d',read_at:null,push_status:'sent'}]){
+   {id:'id-c',read_at:null},{id:'id-d',read_at:null,push_status:'sent'}]){
   const p=invariant(projectNotification(Object.freeze(record)));
   assert.equal(p.provenance,'lumen.inbox');
   assert.equal(p.action.enabled,record.read_at==null);
   assert.doesNotMatch(p.helper,/consegnata (su|al)|ricevuta da Chrome/i);
  }
  assert.equal(projectNotification({}).epistemicStatus,'unknown');
+ for(const invalid of [{id:'a'},{id:'b',read_at:undefined},{id:'c',read_at:''},{id:'d',read_at:'not-a-timestamp'}]){
+  const p=projectNotification(invalid);
+  assert.equal(p.epistemicStatus,'unknown');
+  assert.equal(p.action.enabled,false);
+  assert.notEqual(p.label,'Letta');
+ }
 });
 test('patron projection is a UI affordance only, unknown roles always fail closed',()=>{
  for(const role of ['student','faculty','librarian','admin',undefined,null]){
@@ -109,6 +115,7 @@ test('patron projection is a UI affordance only, unknown roles always fail close
   assert.notEqual(p.epistemicStatus,'supported'); // UI alone never authorizes
  }
  assert.equal(projectPatron({role:'librarian'}).capabilities.staff,false);
+ assert.equal(projectPatron({id:'known',role:'librarian',active:false}).capabilities.staff,false);
 });
 test('Koha pending/timeout is never equated to remote commit',()=>{
  const states=['pending','prepared','submitted','timeout','unknown','failed','rejected','verified','reconciled'];

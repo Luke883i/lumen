@@ -102,8 +102,12 @@ export function projectAcquisition(proposal){
 
 export function projectNotification(notification){
  const record=notification&&typeof notification==='object'?notification:null;
- const known=!!record&&typeof record.id==='string'&&record.id.length>0;
- const unread=known&&(record.read_at===null||record.read_at===undefined);
+ const hasRecord=!!record&&typeof record.id==='string'&&record.id.length>0;
+ const hasReadField=hasRecord&&Object.hasOwn(record,'read_at');
+ const unread=hasReadField&&record.read_at===null;
+ const read=hasReadField&&typeof record.read_at==='string'&&
+   /^\d{4}-\d{2}-\d{2}T/.test(record.read_at)&&Number.isFinite(Date.parse(record.read_at));
+ const known=unread||read;
  return view('notification','lumen.inbox',{
   label:known?(unread?'Da leggere':'Letta'):'Comunicazione da verificare',
   status:known?(unread?'unread':'read'):'unknown',epistemicStatus:known?'supported':'unknown',
@@ -116,7 +120,9 @@ export function projectNotification(notification){
 
 export function projectPatron(user){
  const role=actorRole(user?.role);
- const known=!!role&&typeof user?.id==='string'&&user.id.length>0;
+ // Session UI is advisory, but an explicitly inactive identity must never
+ // acquire visible staff/faculty affordances.
+ const known=!!role&&typeof user?.id==='string'&&user.id.length>0&&user.active!==false;
  const label=role==='faculty'?'Docente':role==='student'?'Studente':
    role==='librarian'?'Bibliotecario':'Ospite';
  const capabilities=freeze({
