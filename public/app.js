@@ -1,8 +1,10 @@
 import {roleNavigation,activeNavigation,taskLinks,staffAreaFromSearch,STAFF_AREAS} from './navigation.js';
+import {createInboxWatcher} from './notification-watch.js';
 import {libraryCopy,installExperience,pushExperience,actionConfirmation,localHoldResult,localStatus,localActionFeedback,localClickFeedback} from './experience.js';
 import {projectLocalBook,projectKohaBook,projectLocalHold,projectLocalLoan,projectAcquisition,projectNotification,projectPatron,projectKohaOperation} from './projections.js';
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
+const inboxWatcher=createInboxWatcher();
 const dialog=document.querySelector('#lumen-dialog');
 const state={user:null,csrf:null,install:null,koha:false,kohaWrite:false,kohaLoans:false,kohaReturns:false,oidcEnabled:false,oidcOnly:false};
 const retryKeys=new Map();
@@ -50,6 +52,29 @@ async function api(path,method='GET',body) {
   if(!r.ok) throw new Error(data.error?.message||'Operazione non riuscita');
   return data;
 }
+// Foreground notification UX is an optional read of the server-owned inbox.
+// No permission prompt and no claim that Chrome displayed a system notification.
+let unreadCount=0;
+function paintUnreadCount(){
+  document.querySelectorAll('[data-notice-count]').forEach(el=>{
+    el.hidden=unreadCount===0;
+    el.textContent=unreadCount>99?'99+':String(unreadCount);
+    el.setAttribute('aria-label',unreadCount+' avvisi non letti');
+  });
+}
+async function refreshInbox(){
+  if(!state.user||document.hidden)return;
+  try{
+    const rows=await api('/api/notifications');
+    const changes=inboxWatcher.observe(state.user.id,rows);
+    unreadCount=changes.unread;
+    paintUnreadCount();
+    if(changes.arrivals>0 && location.pathname!=='/notifiche')
+      message(changes.arrivals===1?'Hai un nuovo avviso nella casella LUMEN.':'Hai '+changes.arrivals+' nuovi avvisi nella casella LUMEN.');
+  }catch{} // Offline browser cannot establish notification truth.
+}
+setInterval(refreshInbox,15000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshInbox();});
 function message(text,bad=false) {
   toast.textContent=text;toast.className='toast'+(bad?' error':'');toast.hidden=false;
   toast.setAttribute('role',bad?'alert':'status');
@@ -100,9 +125,9 @@ function taskHub(title='Azioni utili'){
 function header(){
   const {primary,secondary}=roleNavigation(navigationContext());
   const here=location.pathname;
-  const link=item=>routeLink(item.path,ic(item.icon)+' '+t(item.label),activeNavigation(here,item.path));
+  const link=item=>routeLink(item.path,ic(item.icon)+' '+t(item.label)+(item.path==='/notifiche'?'<span class="unread-count" data-notice-count hidden></span>':''),activeNavigation(here,item.path));
   const primaryDesktop=primary.map(item=>link(item)).join('');
-  const bottom=primary.map(item=>'<a data-nav href="'+esc(item.path)+'" '+(activeNavigation(here,item.path)?'aria-current="page"':'')+'>'+ic(item.icon)+'<span>'+t(item.label)+'</span></a>').join('');
+  const bottom=primary.map(item=>'<a data-nav href="'+esc(item.path)+'" '+(activeNavigation(here,item.path)?'aria-current="page"':'')+'>'+ic(item.icon)+'<span>'+t(item.label)+'</span>'+(item.path==='/notifiche'?'<span class="unread-count" data-notice-count hidden></span>':'')+'</a>').join('');
   const more=secondary.length?'<details class="nav-more"><summary>Altri servizi</summary><div class="nav-more-menu">'
     +secondary.map(item=>routeLink(item.path,t(item.label),activeNavigation(here,item.path))).join('')+'</div></details>':'';
   const account=state.user?routeLink('/impostazioni',ic('user')+' '+t(state.user.name.split(' ')[0]),here==='/impostazioni')
@@ -350,6 +375,7 @@ async function render(){
     root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1">'+markup+'</main>'+footer();
     // Install buttons are state-derived, never shown when Chrome has no prompt.
     document.title='LUMEN · '+(location.pathname==='/'?'La tua biblioteca':location.pathname.split('/')[1]);
+    paintUnreadCount();
   }catch(e){
     root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1">'+sectionTitle('Servizio temporaneamente non disponibile',e.message)+'<a data-nav class="btn" href="/">Torna alla home</a></main>'+footer();
   }
@@ -365,7 +391,7 @@ document.addEventListener('click',async event=>{
     if(action==='logout'){
       // Server logout first revokes every push binding of this session.
       // Browser SW cleanup is only best effort and cannot block logout.
-      await api('/api/logout','POST');state.user=null;state.csrf=null;
+      await api('/api/logout','POST');state.user=null;state.csrf=null;inboxWatcher.reset();unreadCount=0;
       try{await clearLocalPush();}catch{}
       navigate('/');message('Sessione terminata');return;
     }
@@ -451,7 +477,7 @@ document.addEventListener('submit',async event=>{
       await render();return;
     }
     if(action==='change-password'){await api('/api/change-password','POST',data);state.user=null;state.csrf=null;navigate('/accedi');message('Password aggiornata. Effettua nuovamente l’accesso.');return;}
-    if(action==='login'){const r=await api('/api/login','POST',data);state.user=r.user;state.csrf=r.csrf;navigate(r.user.role==='librarian'?'/staff':'/me');message('Accesso effettuato');return;}
+    if(action==='login'){const r=await api('/api/login','POST',data);state.user=r.user;state.csrf=r.csrf;inboxWatcher.reset();unreadCount=0;navigate(r.user.role==='librarian'?'/staff':'/me');void refreshInbox();message('Accesso effettuato');return;}
     if(action==='hold'){const receipt=await api('/api/holds','POST',data);const result=localHoldResult(receipt);message(result.message,result.epistemic==='unknown');await render();return;}
     if(action==='suggest'){const receipt=await api('/api/suggestions','POST',data);message(receipt?.status==='pending'?'Proposta inviata alla biblioteca per la valutazione.':'Esito della proposta da verificare.',receipt?.status!=='pending');await render();return;}
     if(action==='book'){data.copies=Number(data.copies);await api('/api/staff/books','POST',data);}
@@ -502,4 +528,4 @@ window.addEventListener('popstate',render);
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.install=e;if(location.pathname==='/installazione')render();});
 window.addEventListener('appinstalled',()=>{state.install=null;if(location.pathname==='/installazione')render();message('LUMEN installata sul dispositivo');});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
-(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;state.kohaLoans=!!c.koha?.loansEnabled;state.kohaReturns=!!c.koha?.returnsEnabled;state.oidcEnabled=!!c.identity?.oidcEnabled;state.oidcOnly=!!c.identity?.oidcOnly;}catch(e){message(e.message,true);}await render();})();
+(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;state.kohaLoans=!!c.koha?.loansEnabled;state.kohaReturns=!!c.koha?.returnsEnabled;state.oidcEnabled=!!c.identity?.oidcEnabled;state.oidcOnly=!!c.identity?.oidcOnly;}catch(e){message(e.message,true);}await render();void refreshInbox();})();
