@@ -1,6 +1,7 @@
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
 const state={user:null,csrf:null,install:null};
+const retryKeys=new Map();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=s=>esc(s);
 const bookIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7c-3-3-7-3-10-2v14c3-1 7-1 10 2m0-14c3-3 7-3 10-2v14c-3-1-7-1-10 2M12 7v14"/></svg>';
@@ -29,7 +30,10 @@ const routeLink=(route,label,active)=>{
 };
 async function api(path,method='GET',body) {
   const options={method,credentials:'same-origin',headers:{}};
+  const signature=method!=='GET'?JSON.stringify([path,method,body??{}]):null;
   if(method!=='GET'){
+    options.headers['Idempotency-Key']=retryKeys.get(signature)||crypto.randomUUID();
+    retryKeys.set(signature,options.headers['Idempotency-Key']);
     options.headers['Content-Type']='application/json';
     if(state.csrf) options.headers['X-CSRF-Token']=state.csrf;
     options.body=JSON.stringify(body??{});
@@ -38,6 +42,7 @@ async function api(path,method='GET',body) {
   try{r=await fetch(path,options);}
   catch{throw new Error('Servizio non raggiungibile. Riprova quando sei online.');}
   const data=await r.json();
+  if(signature) retryKeys.delete(signature);
   if(!r.ok) throw new Error(data.error?.message||'Operazione non riuscita');
   return data;
 }
@@ -144,7 +149,7 @@ async function settings(){
   const cfg=await api('/api/push-config');
   const status=cfg.enabled?'Le notifiche browser sono disponibili, previa autorizzazione.':'La push non è configurata sul server; la inbox resta disponibile.';
   return sectionTitle('Impostazioni','Il tuo account e le preferenze di comunicazione.')
-    +'<div class="layout section"><div class="card"><h2>Profilo</h2><p><strong>'+t(state.user.name)+'</strong><br>'+t(state.user.email)+'<br>'+badge({student:'Studente',faculty:'Docente',librarian:'Bibliotecario'}[state.user.role])+'</p>'+btn('Esci','logout','','ghost')+'</div>'
+    +'<div class="layout section"><div class="card"><h2>Profilo</h2><p><strong>'+t(state.user.name)+'</strong><br>'+t(state.user.email)+'<br>'+badge({student:'Studente',faculty:'Docente',librarian:'Bibliotecario'}[state.user.role])+'</p>'+btn('Esci','logout','','ghost')+'<hr class="divider"><form class="form" data-form="change-password"><h3>Cambia password</h3>'+field('Password attuale','oldPassword','',true,'password')+field('Nuova password (12+ caratteri)','newPassword','',true,'password')+'<button class="btn small" type="submit">Aggiorna password</button></form></div>'
     +'<div class="card"><h2>Notifiche</h2><p class="muted">'+t(status)+'</p>'+(cfg.enabled?btn('Attiva notifiche push','enable-push','','alt'):'')+'<p class="fine">Puoi installare questa web app dal menu del browser (Installa app/Aggiungi alla schermata Home).</p><button class="btn alt small" type="button" data-click="install" id="install" style="display:none">Installa LUMEN</button></div></div>';
 }
 async function view(){
@@ -200,6 +205,7 @@ document.addEventListener('submit',async event=>{
   const submit=form.querySelector('button[type="submit"]');if(submit)submit.disabled=true;
   try{
     if(action==='search'){navigate('/catalogo?q='+encodeURIComponent(data.query||''));return;}
+    if(action==='change-password'){await api('/api/change-password','POST',data);state.user=null;state.csrf=null;navigate('/accedi');message('Password aggiornata. Effettua nuovamente l’accesso.');return;}
     if(action==='login'){const r=await api('/api/login','POST',data);state.user=r.user;state.csrf=r.csrf;navigate(r.user.role==='librarian'?'/staff':'/me');message('Accesso effettuato');return;}
     if(action==='hold')await api('/api/holds','POST',data);
     if(action==='suggest')await api('/api/suggestions','POST',data);
