@@ -19,6 +19,12 @@ if(prod){
   record('persistent-database-path',path.startsWith('/var/data/')||path.startsWith('/mnt/'),'Production SQLite must live on a persistent disk');
   record('admin-first-start',!!process.env.ADMIN_EMAIL&&!!process.env.ADMIN_PASSWORD&&process.env.ADMIN_PASSWORD.length>=12,'First-start administrative credentials are configured');
 }
+if(process.env.KOHA_CIRCULATION_ENABLED==='1'){
+  record('koha-circulation-configuration',
+    !!(process.env.KOHA_BASE_URL&&process.env.KOHA_CLIENT_ID&&process.env.KOHA_CLIENT_SECRET&&
+    /^[A-Za-z0-9_-]{1,20}$/.test(process.env.KOHA_PICKUP_LIBRARY_ID||'')),
+    'Koha pilot circulation must have server-side URL, credentials and pickup library');
+}
 const path=process.env.LUMEN_DB_PATH;
 if(path&&existsSync(path)){
   try{

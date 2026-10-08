@@ -54,3 +54,7 @@ L6: all saturation evidence binds to a Git SHA, dataset, measured thresholds and
 
 - GitHub Actions: `CI`, `Verify Codespaces Node image`, `R2 load evidence (synthetic)` on the exact commit being promoted.
 - Docs: [Koha](KOHA.md), [Load methodology](LOAD_AUDIT.md), [State-space partitions](STATE_SPACE.md), [Operations](OPERATIONS.md).
+
+## R3 draft (commit-scoped; NOT part of R2 evidence)
+
+Koha-authoritative patron holds are implemented behind `KOHA_CIRCULATION_ENABLED=1` with manual verified mapping, server-enforced user scoping, durable request receipts, failure states and staff positive reconciliation. Test support includes Koha transport mocks, domain mutations and HTTP end-to-end. No controlled live Koha has been connected; K2 and K4-K5 remain BLOCKED. R3 must not be called enterprise production-ready, even with green CI.
