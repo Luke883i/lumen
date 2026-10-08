@@ -16,7 +16,17 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm run check
+      - name: Syntax check with diagnostic capture
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee /tmp/lumen-check.log
+      - name: Report UX-S2 check failures to PR #12
+        if: failure() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo '### UX-S2 CI check diagnostics · ${{ github.sha }}'; echo '~~~text'; tail -n 65 /tmp/lumen-check.log 2>/dev/null || true; echo '~~~'; } > /tmp/ux-s2-check.md
+          gh pr comment 12 --body-file /tmp/ux-s2-check.md
       - run: npm run preflight
       - name: Domain, HTTP and Koha contract tests
         run: |
