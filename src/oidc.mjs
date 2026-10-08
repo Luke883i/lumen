@@ -26,6 +26,10 @@ export function oidcConfiguration(env=process.env){
 }
 export function createOidc(s,env=process.env,provider=null){
   const settings=oidcConfiguration(env);
+  // npm run preflight is advisory unless the process enforces this invariant too.
+  if(settings.enabled && settings.oidcOnly && env.NODE_ENV==='production' &&
+      !s.get("SELECT 1 FROM oidc_bindings b JOIN users u ON u.id=b.user_id WHERE u.role='librarian' AND u.active=1 LIMIT 1"))
+    throw Error('OIDC_PRODUCTION_LOCKOUT: a mapped active librarian is required before SSO-only startup');
   const maxPending=Number.isInteger(Number(env.OIDC_FLOW_LIMIT))&&Number(env.OIDC_FLOW_LIMIT)>=1&&Number(env.OIDC_FLOW_LIMIT)<=50000
     ?Number(env.OIDC_FLOW_LIMIT):20000;
   let cached=null,loading=null;

@@ -125,3 +125,15 @@ test('OIDC v6 refuses a token helper incompatible with the actual library',async
  assert.equal(f.s.get("SELECT count(*) n FROM sessions").n,0);
  f.s.close();
 });
+
+test('production SSO-only runtime refuses to start before an active librarian is mapped',()=>{
+ const f=setup();
+ const secure={...environment,NODE_ENV:'production',OIDC_ONLY:'1',
+   OIDC_REDIRECT_URI:'https://lumen.example.edu/api/auth/oidc/callback'};
+ assert.throws(()=>createOidc(f.s,secure,f.library),/OIDC_PRODUCTION_LOCKOUT/);
+ f.oidc.bind(f.librarian,f.librarian.id,'real-librarian-idp-subject');
+ assert.equal(createOidc(f.s,secure,f.library).only,true);
+ f.s.run('UPDATE users SET active=0 WHERE id=?',f.librarian.id);
+ assert.throws(()=>createOidc(f.s,secure,f.library),/OIDC_PRODUCTION_LOCKOUT/);
+ f.s.close();
+});
