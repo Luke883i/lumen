@@ -203,3 +203,20 @@ test('R9b Web Push key syntax enforces valid P-256 and 16-byte auth before persi
   assert.equal(f.s.get('SELECT count(*) n FROM subscriptions').n,0);
  }finally{f.s.close();}
 });
+
+test('interrupted pre-R9b migration cannot retain unowned device subscriptions',()=>{
+ const dir=mkdtempSync(join(tmpdir(),'lumen-r9b-partial-'));
+ const filename=join(dir,'partial.sqlite');
+ try{
+  const db=openStore(filename);
+  bootstrap(db,{NODE_ENV:'test',LUMEN_DEMO:'1'});
+  const user=db.get("SELECT id FROM users WHERE role='student'");
+  db.run('INSERT INTO subscriptions(endpoint,user_id,payload,created_at,session_hash) VALUES(?,?,?,?,?)',
+    endpoint('stranded'),user.id,JSON.stringify(sub('stranded')),new Date().toISOString(),'');
+  db.close();
+  const restored=openStore(filename);
+  assert.equal(restored.get('SELECT count(*) n FROM subscriptions').n,0);
+  assert.equal(restored.get("SELECT count(*) n FROM sqlite_master WHERE type='index' AND name='idx_subscriptions_session_hash'").n,1);
+  restored.close();
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});

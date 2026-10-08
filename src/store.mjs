@@ -86,9 +86,17 @@ export function openStore(path = './data/lumen.sqlite') {
     db.exec("ALTER TABLE sessions ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'local' CHECK(auth_method IN ('local','oidc'))");
   // R9b: existing push rows cannot be proven to belong to the session that
   // registered them. Purge only those legacy device bindings (inbox remains).
-  if(!db.prepare('PRAGMA table_info(subscriptions)').all().some(x=>x.name==='session_hash')){
-    db.exec("ALTER TABLE subscriptions ADD COLUMN session_hash TEXT NOT NULL DEFAULT ''");
+  // Atomic and restart-idempotent: a crash after the schema change must not
+  // leave legacy unowned device bindings eligible for future delivery.
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    if(!db.prepare('PRAGMA table_info(subscriptions)').all().some(x=>x.name==='session_hash'))
+      db.exec("ALTER TABLE subscriptions ADD COLUMN session_hash TEXT NOT NULL DEFAULT ''");
     db.exec("DELETE FROM subscriptions WHERE session_hash=''");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_subscriptions_session_hash ON subscriptions(session_hash)");
+    db.exec('COMMIT');
+  } catch(error) {
+    db.exec('ROLLBACK');throw error;
   }
   if (!db.prepare("SELECT 1 FROM metadata WHERE key='catalog_fts_v1'").get()) {
     db.exec('BEGIN IMMEDIATE');
