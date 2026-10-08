@@ -51,7 +51,7 @@ export function createService(s) {
         if(past.operation!==operation||past.payload_hash!==digest) fail(409,'IDEMPOTENCY_CONFLICT','Chiave già usata per operazione diversa');
         return JSON.parse(past.result_json);
       }
-      const result=fn();
+      const result=JSON.parse(JSON.stringify(fn()));
       s.run('INSERT INTO idempotency(user_id,key,operation,payload_hash,result_json,created_at) VALUES(?,?,?,?,?,?)',user.id,key,operation,digest,JSON.stringify(result),now());
       return result;
     });

@@ -37,3 +37,6 @@ UNVERIFIED = external dependency or production environment not exercised.
 BLOCKED = cannot claim until missing gate passes.
 
 Production-ready, 2,000 concurrent, Koha-integrated, institutional SSO, email-delivery and proof-grade are currently **UNVERIFIED / BLOCKED**.
+
+## Dependency and replay contract
+Production builds use npm ci with a committed lockfile and pinned Node 24.21.0. A supplied Idempotency-Key (12-100 safe characters) is scoped to a user and payload; committed results are replayed verbatim, mismatched reuses are rejected with 409. Critical write receipts and business state persist in one SQLite transaction. The PWA reuses its request key on network failure for identical payloads.

@@ -16,16 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - run: npm install
-      - name: Publish initial lockfile in PR for reproducibility
-        if: github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if ! git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
-            { echo 'LOCK_JSON_BEGIN'; cat package-lock.json; echo 'LOCK_JSON_END'; } > /tmp/lumen-lock-report.txt
-            gh pr comment 1 --body-file /tmp/lumen-lock-report.txt
-          fi
+      - run: npm ci
       - run: npm run check
       - name: Run domain and HTTP tests
         run: |

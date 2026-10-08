@@ -10,7 +10,7 @@
       "onAutoForward": "openBrowser"
     }
   },
-  "postCreateCommand": "npm install",
+  "postCreateCommand": "npm ci",
   "customizations": {
     "vscode": {
       "extensions": [
