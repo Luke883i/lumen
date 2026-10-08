@@ -38,6 +38,7 @@ function setup(overrides={}){
 }
 test('OIDC config is strictly opt-in, issuer HTTPS and callback explicit',()=>{
  assert.equal(oidcConfiguration({}).enabled,false);
+ assert.throws(()=>oidcConfiguration({OIDC_ONLY:'1'}),/OIDC_CONFIGURATION/);
  assert.throws(()=>oidcConfiguration({...environment,OIDC_CLIENT_SECRET:''}),/OIDC_CONFIGURATION/);
  assert.throws(()=>oidcConfiguration({...environment,OIDC_ISSUER:'http://idp.example.edu'}),/OIDC_CONFIGURATION/);
  assert.throws(()=>oidcConfiguration({...environment,NODE_ENV:'production'}),/OIDC_CONFIGURATION/);

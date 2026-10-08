@@ -11,7 +11,10 @@ const isSubject=s=>typeof s==='string'&&s.length>0&&s.length<=255&&!/[\u0000-\u0
 export function oidcConfiguration(env=process.env){
   const keys=['OIDC_ISSUER','OIDC_CLIENT_ID','OIDC_CLIENT_SECRET','OIDC_REDIRECT_URI'];
   const values=keys.filter(k=>!!env[k]);
-  if(!values.length)return {enabled:false};
+  if(!values.length){
+    if(env.OIDC_ONLY==='1')throw Error('OIDC_CONFIGURATION: OIDC_ONLY requires a configured provider');
+    return {enabled:false};
+  }
   if(values.length!==keys.length)throw Error('OIDC_CONFIGURATION: issuer, client id/secret and redirect URI are required together');
   const issuer=new URL(env.OIDC_ISSUER),redirect=new URL(env.OIDC_REDIRECT_URI);
   const loopback=env.NODE_ENV==='test'&&redirect.protocol==='http:'&&['127.0.0.1','localhost'].includes(redirect.hostname);
