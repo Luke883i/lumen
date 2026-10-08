@@ -6,6 +6,7 @@ on:
       - 'src/**'
       - 'perf/**'
       - 'scripts/seed-load.mjs'
+      - 'scripts/audit-load.mjs'
       - '.github/workflows/load-audit.yml'
   workflow_dispatch:
 permissions:
@@ -73,3 +74,64 @@ jobs:
             perf/k6-run.log
             /tmp/lumen-load-server.log
           if-no-files-found: warn
+
+  write-2000:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      LUMEN_DEMO: '0'
+      LUMEN_DB_PATH: ./data/load-writes.sqlite
+      LOAD_USERS: '2000'
+      LOAD_BOOKS: '20000'
+      TARGET_URL: http://127.0.0.1:3000
+      PORT: '3000'
+      GIT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: node scripts/seed-load.mjs
+      - name: Start actual server for concurrent holds
+        run: |
+          node src/server.mjs > /tmp/lumen-write-server.log 2>&1 &
+          echo $! > /tmp/lumen-write-server.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/health > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/lumen-write-server.log
+          exit 1
+      - uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: '0.49.0'
+      - name: Exercise 2000 concurrent session writes and idempotent replay
+        run: |
+          set -o pipefail
+          k6 run perf/write.k6.js 2>&1 | tee perf/write-run.log
+      - name: Audit state after concurrent mutations
+        if: always()
+        run: node scripts/audit-load.mjs | tee perf/write-audit.log
+      - name: Publish write saturation evidence
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo '### Mixed write saturation · ${{ github.sha }}'
+            echo '~~~text'
+            tail -n 42 perf/write-run.log 2>/dev/null || true
+            tail -n 22 perf/write-audit.log 2>/dev/null || true
+            echo '~~~'
+          } > perf/write-report.md
+          gh pr comment 2 --body-file perf/write-report.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lumen-write-evidence-${{ github.sha }}
+          path: |
+            perf/write-evidence.json
+            perf/write-run.log
+            perf/write-audit.log
