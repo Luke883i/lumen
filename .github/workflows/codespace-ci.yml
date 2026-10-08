@@ -19,4 +19,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Inspect exact devcontainer base image
         run: |
-          docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm             bash -lc 'bash scripts/doctor.sh && npm ci && npm run check && npm test'
+          docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/devcontainers/javascript-node:24-bookworm             bash -lc 'bash scripts/doctor.sh && npm ci && npm run check && npm test'
