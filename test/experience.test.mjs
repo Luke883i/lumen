@@ -116,3 +116,19 @@ test('manifest identity, service-worker precache and semantic UI routes are cohe
  const css=load('public/style.css');
  assert.equal(/var\(--lumen-[^)]+\)[a-z0-9]+/.test(css),false,'no invalid concatenated CSS token');
 });
+
+test('availability statuses do not invent a queue or unknown stock',async()=>{
+ const {localAvailability}=await import('../public/experience.js');
+ for(const v of [null,undefined,NaN,1.5,-1,'0'])
+   assert.equal(localAvailability(v).status,'unknown');
+ assert.equal(localAvailability(0).label,'Nessuna copia disponibile ora');
+ assert.equal(localAvailability(1).label,'1 copia disponibile');
+ assert.equal(localAvailability(3).label,'3 copie disponibili');
+});
+test('hold receipt disambiguates ready vs queued vs unverified',async()=>{
+ const {localHoldResult}=await import('../public/experience.js');
+ assert.match(localHoldResult({status:'ready'}).message,/pronta per il ritiro/i);
+ assert.match(localHoldResult({status:'queued'}).message,/in coda/i);
+ for(const v of [null,undefined,{}, {status:'pending'}])
+   assert.equal(localHoldResult(v).epistemic,'unknown');
+});
