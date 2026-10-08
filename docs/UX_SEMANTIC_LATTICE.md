@@ -1,6 +1,6 @@
 # LUMEN — residual semantic and UX lattice (2026-10-08)
 
-Canonical baseline: UX-S1 merged; UX-S2 implemented in PR #12 from main `edf5ececa74da753005c5cfe3fe0e0c7a7c8f00d`. This document **does not assert** live Render/Koha/IdP/device/2,000-concurrent certification.
+Canonical baseline: UX-S1 and UX-S2 merged; UX-S3 implemented in PR #13 from main c5c9374c1eb5243f7fc01078ddf482d974e607c3. This document **does not assert** live Render/Koha/IdP/device/2,000-concurrent certification.
 
 ## Product intent: minimum code, maximum understandable action
 
@@ -19,9 +19,9 @@ MERGED baseline (R1–R9b)
           |
      UX-S1 semantic truth / domain glossary / copy policy      [merged]
           |
-     UX-S2 non-authoritative projection and action contracts    [PR #12]
+     UX-S2 non-authoritative projection and action contracts    [merged]
           |
-     UX-S3 role/task IA and progressive-disclosure recomposition
+     UX-S3 role/task IA and progressive-disclosure recomposition [PR #13]
           |
      UX-S4 visual compression and responsive density budgets
           |

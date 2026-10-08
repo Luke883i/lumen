@@ -6,6 +6,10 @@ LUMEN is a deployable, installable library-services PWA for patrons, faculty and
 
 Le schermate mostrano provenienza, stato e possibilità di azione a partire dalle risposte già disponibili: le disponibilità del catalogo LUMEN non vengono trasferite per inferenza a Koha; il rinnovo resta condizionato alle regole del backend; notifiche nell'inbox e consegne sul dispositivo rimangono distinte. Nessuna nuova sorgente autorevole o dipendenza di produzione. [Contratti, DoD ed esempi](docs/UX_PROJECTIONS.md).
 
+## UX-S3: find the next task
+
+Role-aware navigation now presents at most five primary destinations. A librarian chooses one task on /staff (circulation, catalog, acquisitions, people, communications, integrations), rather than scanning every form at once. Local and Koha services remain distinct. See [UX-S3 IA contract](docs/UX_S3_IA.md). Codespaces still uses npm run dev, Render still uses npm start.
+
 ## R9b — Push identity and device revocation
 
 Web Push is now scoped to authenticated account and session. Browser logout and account replacement revoke old server enrollment; no account can silently take over another endpoint. Legacy push enrollments are cleared on migration and require user opt-in again. [Lifecycle and release gates](docs/PUSH_LIFECYCLE.md).
