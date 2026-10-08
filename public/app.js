@@ -1,8 +1,10 @@
 import {roleNavigation,activeNavigation,taskLinks,staffAreaFromSearch,STAFF_AREAS} from './navigation.js';
+import {createInboxWatcher} from './notification-watch.js';
 import {libraryCopy,installExperience,pushExperience,actionConfirmation,localHoldResult,localStatus,localActionFeedback,localClickFeedback} from './experience.js';
 import {projectLocalBook,projectKohaBook,projectLocalHold,projectLocalLoan,projectAcquisition,projectNotification,projectPatron,projectKohaOperation} from './projections.js';
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
+const inboxWatcher=createInboxWatcher();
 const dialog=document.querySelector('#lumen-dialog');
 const state={user:null,csrf:null,install:null,koha:false,kohaWrite:false,kohaLoans:false,kohaReturns:false,oidcEnabled:false,oidcOnly:false};
 const retryKeys=new Map();
@@ -50,6 +52,29 @@ async function api(path,method='GET',body) {
   if(!r.ok) throw new Error(data.error?.message||'Operazione non riuscita');
   return data;
 }
+// Foreground notification UX is an optional read of the server-owned inbox.
+// No permission prompt and no claim that Chrome displayed a system notification.
+let unreadCount=0;
+function paintUnreadCount(){
+  document.querySelectorAll('[data-notice-count]').forEach(el=>{
+    el.hidden=unreadCount===0;
+    el.textContent=unreadCount>99?'99+':String(unreadCount);
+    el.setAttribute('aria-label',unreadCount+' avvisi non letti');
+  });
+}
+async function refreshInbox(){
+  if(!state.user||document.hidden)return;
+  try{
+    const rows=await api('/api/notifications');
+    const changes=inboxWatcher.observe(state.user.id,rows);
+    unreadCount=changes.unread;
+    paintUnreadCount();
+    if(changes.arrivals>0 && location.pathname!=='/notifiche')
+      message(changes.arrivals===1?'Hai un nuovo avviso nella casella LUMEN.':'Hai '+changes.arrivals+' nuovi avvisi nella casella LUMEN.');
+  }catch{} // Offline browser cannot establish notification truth.
+}
+setInterval(refreshInbox,15000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshInbox();});
 function message(text,bad=false) {
   toast.textContent=text;toast.className='toast'+(bad?' error':'');toast.hidden=false;
   toast.setAttribute('role',bad?'alert':'status');
@@ -100,9 +125,9 @@ function taskHub(title='Azioni utili'){
 function header(){
   const {primary,secondary}=roleNavigation(navigationContext());
   const here=location.pathname;
-  const link=item=>routeLink(item.path,ic(item.icon)+' '+t(item.label),activeNavigation(here,item.path));
+  const link=item=>routeLink(item.path,ic(item.icon)+' '+t(item.label)+(item.path==='/notifiche'?'<span class="unread-count" data-notice-count hidden></span>':''),activeNavigation(here,item.path));
   const primaryDesktop=primary.map(item=>link(item)).join('');
-  const bottom=primary.map(item=>'<a data-nav href="'+esc(item.path)+'" '+(activeNavigation(here,item.path)?'aria-current="page"':'')+'>'+ic(item.icon)+'<span>'+t(item.label)+'</span></a>').join('');
+  const bottom=primary.map(item=>'<a data-nav href="'+esc(item.path)+'" '+(activeNavigation(here,item.path)?'aria-current="page"':'')+'>'+ic(item.icon)+'<span>'+t(item.label)+'</span>'+(item.path==='/notifiche'?'<span class="unread-count" data-notice-count hidden></span>':'')+'</a>').join('');
   const more=secondary.length?'<details class="nav-more"><summary>Altri servizi</summary><div class="nav-more-menu">'
     +secondary.map(item=>routeLink(item.path,t(item.label),activeNavigation(here,item.path))).join('')+'</div></details>':'';
   const account=state.user?routeLink('/impostazioni',ic('user')+' '+t(state.user.name.split(' ')[0]),here==='/impostazioni')
@@ -168,11 +193,14 @@ async function staff(){
   const area=staffAreaFromSearch(location.search);
   // Every work area fetches only the authoritative inputs it actually renders.
   // Server RBAC is still mandatory for each endpoint and action.
-  const [data,users,books,suggestions]=await Promise.all([
+  const holdOffsetRaw=Number(new URLSearchParams(location.search).get('offset')||0);
+  const holdOffset=Number.isSafeInteger(holdOffsetRaw)&&holdOffsetRaw>=0?holdOffsetRaw:0;
+  const [data,users,books,suggestions,staffHolds]=await Promise.all([
     ['panoramica','circolazione'].includes(area)?api('/api/staff/stats'):Promise.resolve(null),
     ['circolazione','persone','integrazioni'].includes(area)?api('/api/staff/users'):Promise.resolve([]),
     area==='circolazione'?api('/api/books'):Promise.resolve([]),
-    area==='acquisti'?api('/api/suggestions'):Promise.resolve([])
+    area==='acquisti'?api('/api/suggestions'):Promise.resolve([]),
+    area==='circolazione'?api('/api/staff/holds?offset='+holdOffset+'&limit=50'):Promise.resolve(null)
   ]);
   const options=arr=>arr.map(x=>'<option value="'+esc(x.id)+'">'+t(x.name||x.title)+' ('+t(x.email||x.author)+')</option>').join('');
   const oidcMapping=state.oidcEnabled?'<section class="section card"><h2>Collega identità istituzionale</h2><p class="fine">Inserisci il subject OIDC ufficialmente verificato dall’amministratore IdP. Non usare l’indirizzo email come subject. La modifica di una associazione esistente è bloccata.</p><form class="form" data-form="oidc-bind"><label>Account LUMEN<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label>'+field('OIDC subject (sub)','subject','ID stabile IdP',true)+'<button class="btn small" type="submit">Associa subject</button></form></section>':'';
@@ -187,11 +215,16 @@ async function staff(){
     .map(item=>'<a class="task-link" data-nav href="/staff?area='+item.id+'"><span><strong>'+t(item.label)+'</strong><small>'+t(item.hint)+'</small></span><span aria-hidden="true">→</span></a>').join('')+'</div>';
   const screens={
     panoramica: ()=>'<div class="grid section">'+[['Titoli',data.books],['Copie',data.copies],['Prestiti attivi',data.loans],['Utenti',data.users],['In coda',data.queued],['Acquisti da valutare',data.pending]].map(([k,v])=>'<div class="card"><p class="label">'+t(k)+'</p><p class="metric">'+v+'</p></div>').join('')+'</div>' +'<section class="section"><h2>Vai a un’attività</h2>'+overviewLinks+'</section>',
-    circolazione: ()=>'<section class="section staff-panel"><div class="card"><h2>Registra prestito</h2><form class="form" data-form="checkout"><label>Utente<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label><label>Libro<select name="bookId" required>'+options(books)+'</select></label><button class="btn" type="submit">Consegna volume</button></form></div></section>' + '<section class="section"><h2>Prestiti da gestire</h2><div class="card table-wrap"><table class="table"><thead><tr><th>Titolo</th><th>Utente</th><th>Scadenza</th><th>Operazione</th></tr></thead><tbody>'+data.activeLoans.map(x=>'<tr><td>'+t(x.title)+'</td><td>'+t(x.patron)+'</td><td>'+humanDate(x.due_at)+'</td><td>'+btn('Restituisci','return',x.id,'alt')+'</td></tr>').join('')+'</tbody></table>'+(moneyless(data.activeLoans)?empty('Nessun prestito attivo'):'')+'</div></section>' + '<section class="section"><h2>Ritiri pronti</h2><div class="grid">'+(data.readyHolds.length?data.readyHolds.map(x=>'<div class="card"><h3>'+t(x.title)+'</h3><p>'+t(x.patron)+'</p>'+btn('Consegna copia','issue-ready',x.book_id+'|'+x.user_id,'alt')+'</div>').join(''):empty('Nessun ritiro in attesa.'))+'</div></section>',
+    circolazione: ()=>'<section class="section staff-panel"><div class="card"><h2>Registra prestito</h2><form class="form" data-form="checkout"><label>Utente<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label><label>Libro<select name="bookId" required>'+options(books)+'</select></label><button class="btn" type="submit">Consegna volume</button></form></div></section>' + '<section class="section"><h2>Prestiti da gestire</h2><div class="card table-wrap"><table class="table"><thead><tr><th>Titolo</th><th>Utente</th><th>Scadenza</th><th>Operazione</th></tr></thead><tbody>'+data.activeLoans.map(x=>'<tr><td>'+t(x.title)+'</td><td>'+t(x.patron)+'</td><td>'+humanDate(x.due_at)+'</td><td>'+btn('Restituisci','return',x.id,'alt')+'</td></tr>').join('')+'</tbody></table>'+(moneyless(data.activeLoans)?empty('Nessun prestito attivo'):'')+'</div></section>' + '<section class="section" id="richieste-prenotazione"><div class="section-head"><h2>Prenotazioni da gestire</h2><span class="fine">'+staffHolds.total+' aperte nel catalogo LUMEN</span></div>'
+      +'<p class="fine">Le richieste in coda sono visibili ma non autorizzano la consegna. Registra il prestito solo quando la prenotazione è pronta e la copia è fisicamente al banco.</p>'
+      +'<div class="list">'+(staffHolds.rows.length?staffHolds.rows.map(x=>'<article class="card row space staff-hold" data-hold-id="'+esc(x.id)+'"><div><h3>'+t(x.title)+'</h3><p class="fine">Richiesta da '+t(x.patron)+' · '+humanDate(x.created_at)+'</p>'+badge(x.status==='ready'?'Pronta al ritiro':'In coda',x.status==='ready'?'':'warn')+'</div>'
+      +(x.status==='ready'?btn('Registra consegna','issue-ready',x.book_id+'|'+x.user_id,'alt'):'<span class="fine">Attendi disponibilità</span>')+'</article>').join(''):empty('Nessuna prenotazione aperta.'))+'</div>'
+      +'<nav class="row" aria-label="Pagine prenotazioni">'+(holdOffset>0?'<a class="btn alt small" data-nav href="/staff?area=circolazione&offset='+Math.max(0,holdOffset-50)+'">← Precedenti</a>':'')
+      +(holdOffset+staffHolds.rows.length<staffHolds.total?'<a class="btn alt small" data-nav href="/staff?area=circolazione&offset='+(holdOffset+50)+'">Successive →</a>':'')+'</nav></section>',
     catalogo: ()=>'<section class="section staff-panel"><div class="card"><h2>Copia e catalogo</h2><form class="form" data-form="book">'+field('Titolo','title')+field('Autore','author')+field('ISBN','isbn','ISBN',false)+field('Materia','subject','Materia',false)+field('Scaffale','shelf','Collocazione',false)+field('Numero copie','copies','1',true,'number')+'<button class="btn" type="submit">Registra titolo e copie</button></form></div></section>',
     acquisti: ()=>'<section class="section"><h2>Proposte d’acquisto</h2><div class="list">'+(suggestions.length?suggestions.map(x=>'<div class="card row space"><div><h3>'+t(x.title)+'</h3><p class="fine">'+t(x.author)+' · Richiesta da '+t(x.requester)+'</p><p>'+t(x.reason)+'</p>'+badge(projectAcquisition(x).label)+'</div><div class="row">'+(x.status==='pending'?btn('Approva','approve',x.id,'alt')+btn('Rifiuta','reject',x.id,'ghost'):'')+(x.status==='approved'?btn('Ordinato','ordered',x.id,'alt'):'')+'</div></div>').join(''):empty('Nessuna proposta.'))+'</div></section>',
     persone: ()=>'<section class="section"><h2>Account abilitati</h2><div class="card table-wrap"><table class="table"><thead><tr><th>Nome</th><th>Profilo</th><th>Stato</th><th>Operazione</th></tr></thead><tbody>'+users.map(x=>'<tr><td>'+t(x.name)+'<br><span class="fine">'+t(x.email)+'</span></td><td>'+t(x.role)+'</td><td>'+badge(x.active?'Attivo':'Disattivato',x.active?'':'gray')+'</td><td>'+(x.active&&x.id!==state.user.id?btn('Disattiva','disable',x.id,'ghost'):'')+'</td></tr>').join('')+'</tbody></table></div></section>' + '<section class="section staff-panel"><div class="card"><h2>Nuovo utente</h2><form class="form" data-form="user">'+field('Nome e cognome','name')+field('Email istituzionale','email','utente@istituzione.it',true,'email')+'<label>Profilo<select name="role"><option value="student">Studente</option><option value="faculty">Docente</option><option value="librarian">Bibliotecario</option></select></label>'+field('Password temporanea (12+ caratteri)','password','Minimo 12 caratteri',true,'password')+'<button class="btn" type="submit">Crea account</button></form></div></section>',
-    comunicazioni: ()=>'<section class="section staff-panel"><div class="card"><h2>Avviso collettivo</h2><form class="form" data-form="broadcast"><label>Destinatari<select name="role"><option value="all">Tutti</option><option value="student">Studenti</option><option value="faculty">Docenti</option><option value="librarian">Bibliotecari</option></select></label>'+field('Oggetto','title')+'<label>Testo<textarea name="body" required maxlength="600"></textarea></label><button class="btn" type="submit">Invia alla inbox</button></form></div></section>',
+    comunicazioni: ()=>'<section class="section staff-panel"><div class="card"><h2>Avviso agli utenti</h2><p class="fine">I destinatari ricevono sempre un messaggio nella casella LUMEN. Le notifiche fuori dall’app richiedono un dispositivo autorizzato e Web Push attivo; non sono garantite.</p><form class="form" data-form="broadcast"><label>Destinatari<select name="role"><option value="all">Tutti</option><option value="student">Studenti</option><option value="faculty">Docenti</option><option value="librarian">Bibliotecari</option></select></label>'+field('Oggetto','title')+'<label>Testo<textarea name="body" required maxlength="600"></textarea></label><button class="btn" type="submit">Invia alla casella LUMEN</button></form></div></section>',
     integrazioni: ()=>(oidcMapping+kohaMapping+kohaLoanDesk+kohaReturnDesk)
       ||empty('Nessuna integrazione istituzionale attivata. I servizi standalone restano disponibili.')
   };
@@ -342,6 +375,7 @@ async function render(){
     root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1">'+markup+'</main>'+footer();
     // Install buttons are state-derived, never shown when Chrome has no prompt.
     document.title='LUMEN · '+(location.pathname==='/'?'La tua biblioteca':location.pathname.split('/')[1]);
+    paintUnreadCount();
   }catch(e){
     root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1">'+sectionTitle('Servizio temporaneamente non disponibile',e.message)+'<a data-nav class="btn" href="/">Torna alla home</a></main>'+footer();
   }
@@ -357,7 +391,7 @@ document.addEventListener('click',async event=>{
     if(action==='logout'){
       // Server logout first revokes every push binding of this session.
       // Browser SW cleanup is only best effort and cannot block logout.
-      await api('/api/logout','POST');state.user=null;state.csrf=null;
+      await api('/api/logout','POST');state.user=null;state.csrf=null;inboxWatcher.reset();unreadCount=0;
       try{await clearLocalPush();}catch{}
       navigate('/');message('Sessione terminata');return;
     }
@@ -443,13 +477,17 @@ document.addEventListener('submit',async event=>{
       await render();return;
     }
     if(action==='change-password'){await api('/api/change-password','POST',data);state.user=null;state.csrf=null;navigate('/accedi');message('Password aggiornata. Effettua nuovamente l’accesso.');return;}
-    if(action==='login'){const r=await api('/api/login','POST',data);state.user=r.user;state.csrf=r.csrf;navigate(r.user.role==='librarian'?'/staff':'/me');message('Accesso effettuato');return;}
+    if(action==='login'){const r=await api('/api/login','POST',data);state.user=r.user;state.csrf=r.csrf;inboxWatcher.reset();unreadCount=0;navigate(r.user.role==='librarian'?'/staff':'/me');void refreshInbox();message('Accesso effettuato');return;}
     if(action==='hold'){const receipt=await api('/api/holds','POST',data);const result=localHoldResult(receipt);message(result.message,result.epistemic==='unknown');await render();return;}
     if(action==='suggest'){const receipt=await api('/api/suggestions','POST',data);message(receipt?.status==='pending'?'Proposta inviata alla biblioteca per la valutazione.':'Esito della proposta da verificare.',receipt?.status!=='pending');await render();return;}
     if(action==='book'){data.copies=Number(data.copies);await api('/api/staff/books','POST',data);}
     if(action==='user')await api('/api/staff/users','POST',data);
     if(action==='checkout')await api('/api/staff/checkout','POST',data);
-    if(action==='broadcast')await api('/api/staff/broadcast','POST',data);
+    if(action==='broadcast'){
+      const result=await api('/api/staff/broadcast','POST',data);
+      message('Avviso registrato nella casella di '+result.recipients+' destinatari. La consegna di sistema dipende dal browser.');
+      await render();return;
+    }
     message(localActionFeedback(action)||'Esito da verificare nella pagina corrente.',!localActionFeedback(action));await render();
   }catch(e){message(e.message,true);if(submit)submit.disabled=false;}
 });
@@ -490,4 +528,4 @@ window.addEventListener('popstate',render);
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.install=e;if(location.pathname==='/installazione')render();});
 window.addEventListener('appinstalled',()=>{state.install=null;if(location.pathname==='/installazione')render();message('LUMEN installata sul dispositivo');});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
-(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;state.kohaLoans=!!c.koha?.loansEnabled;state.kohaReturns=!!c.koha?.returnsEnabled;state.oidcEnabled=!!c.identity?.oidcEnabled;state.oidcOnly=!!c.identity?.oidcOnly;}catch(e){message(e.message,true);}await render();})();
+(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;state.kohaLoans=!!c.koha?.loansEnabled;state.kohaReturns=!!c.koha?.returnsEnabled;state.oidcEnabled=!!c.identity?.oidcEnabled;state.oidcOnly=!!c.identity?.oidcOnly;}catch(e){message(e.message,true);}await render();void refreshInbox();})();

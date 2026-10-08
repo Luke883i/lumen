@@ -32,7 +32,7 @@ async function stop(child){
  await Promise.race([new Promise(ok=>child.once('exit',ok)),sleep(2500)]);
  if(child.exitCode===null)try{if(process.platform==='win32')child.kill('SIGKILL');else process.kill(-child.pid,'SIGKILL');}catch{}
 }
-async function scenario(label,args,filename){
+async function scenario(label,args,filename,expectPush=false){
  const port=await freePort(),origin='http://127.0.0.1:'+port,logs=[];
  const child=spawn('npm',args,{cwd:root,detached:process.platform!=='win32',
   stdio:['ignore','pipe','pipe'],env:{...process.env,NODE_ENV:'test',LUMEN_DEMO:'1',PORT:String(port),LUMEN_DB_PATH:join(scratch,filename)}});
@@ -46,6 +46,10 @@ async function scenario(label,args,filename){
   if(manifest.status!==200 || (await manifest.json()).display!=='standalone')throw Error('manifest invalid');
   const version=await fetch(origin+'/api/version');
   if(version.status!==200||(await version.json()).service!=='lumen')throw Error('revision endpoint missing');
+  const configuration=await (await fetch(origin+'/api/push-config')).json();
+  if(expectPush){
+    if(configuration.enabled!==true||!configuration.publicKey)throw Error('opt-in VAPID server not enabled');
+  }else if(!process.env.VAPID_PUBLIC_KEY&&configuration.enabled)throw Error('default boot unexpectedly enabled push');
   const catalogue=await fetch(origin+'/api/books');
   if(catalogue.status!==200 || (await catalogue.json()).length<1)throw Error('catalogue missing');
   const login=await fetch(origin+'/api/login',{method:'POST',
@@ -64,6 +68,7 @@ async function scenario(label,args,filename){
 try{
  await scenario('npm run dev',['run','dev'],'codespaces.sqlite');
  await scenario('npm start',['start'],'standalone.sqlite');
+ await scenario('npm run dev:push',['run','dev:push'],'push.sqlite',true);
  console.log(JSON.stringify({suite:'lumen_fresh_boot',status:'PASS',scenarios:results.length}));
 }catch(e){console.error(e);process.exitCode=1;}
 finally{rmSync(scratch,{recursive:true,force:true});}

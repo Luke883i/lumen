@@ -289,3 +289,70 @@ test('UX-S3 selected staff workspaces do not fetch unrelated bibliographic and i
  expect(requested).not.toContain('/api/staff/users');
  expect(requested).not.toContain('/api/staff/stats');
 });
+
+test('Fix E2E: queued and ready holds reach the librarian desk with honest actions',async({browser})=>{
+ const staffContext=await browser.newContext(),patronContext=await browser.newContext();
+ const staff=await staffContext.newPage(),patron=await patronContext.newPage();
+ try{
+  await signIn(staff,'librarian');
+  const librarianInboxBefore=await (await staff.request.get('/api/notifications')).json();
+  const before=librarianInboxBefore.filter(n=>n.kind==='staff_hold').length;
+  await signIn(patron,'student');
+  await staff.goto('/staff?area=catalogo');
+  const unique='Reservation E2E '+Date.now();
+  const form=staff.locator('form[data-form="book"]');
+  await form.locator('input[name="title"]').fill(unique);
+  await form.locator('input[name="author"]').fill('E2E Test');
+  await form.locator('input[name="copies"]').fill('1');
+  await form.getByRole('button',{name:'Registra titolo e copie'}).click();
+  await expect(staff.locator('#toast')).toContainText(/Titolo|copie|registrat/i);
+  await patron.goto('/catalogo?q='+encodeURIComponent(unique));
+  const card=patron.locator('.book-card').filter({hasText:unique});
+  await expect(card).toBeVisible();
+  await card.locator('a[data-nav]').first().click();
+  await patron.locator('form[data-form="hold"] button[type="submit"]').click();
+  await expect(patron.locator('#toast')).toContainText(/Prenotazione pronta per il ritiro/);
+  await staff.goto('/staff?area=circolazione');
+  await expect(staff.getByRole('heading',{name:'Prenotazioni da gestire'})).toBeVisible();
+  const row=staff.locator('.staff-hold').filter({hasText:unique});
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('Pronta al ritiro');
+  await expect(row.getByRole('button',{name:'Registra consegna'})).toBeVisible();
+  const staffInbox=await (await staff.request.get('/api/notifications')).json();
+  expect(staffInbox.filter(n=>n.kind==='staff_hold').length).toBeGreaterThan(before);
+  // A second reservation for this one-copy title must join the queue,
+  // and never show an early checkout CTA.
+  const secondContext=await browser.newContext(),second=await secondContext.newPage();
+  try{
+   await signIn(second,'faculty');
+   await second.goto('/catalogo?q='+encodeURIComponent(unique));
+   await second.locator('.book-card').filter({hasText:unique}).locator('a[data-nav]').first().click();
+   await second.locator('form[data-form="hold"] button[type="submit"]').click();
+   await expect(second.locator('#toast')).toContainText('Prenotazione in coda');
+   await staff.reload();
+   const queued=staff.locator('.staff-hold').filter({hasText:unique}).filter({hasText:'In coda'});
+   await expect(queued).toBeVisible();
+   await expect(queued.getByRole('button',{name:'Registra consegna'})).toHaveCount(0);
+  }finally{await secondContext.close();}
+ }finally{await staffContext.close();await patronContext.close();}
+});
+
+test('Fix E2E: librarian broadcast reaches student inbox without invented OS delivery',async({browser})=>{
+ const c1=await browser.newContext(),c2=await browser.newContext();
+ const staff=await c1.newPage(),student=await c2.newPage();
+ try{
+  await signIn(staff,'librarian');
+  await signIn(student,'student');
+  await staff.goto('/staff?area=comunicazioni');
+  const form=staff.locator('form[data-form="broadcast"]');
+  const unique='Messaggio E2E '+Date.now();
+  await form.locator('select[name="role"]').selectOption('student');
+  await form.locator('input[name="title"]').fill(unique);
+  await form.locator('textarea[name="body"]').fill('Messaggio di prova nella casella.');
+  await form.getByRole('button',{name:'Invia alla casella LUMEN'}).click();
+  await expect(staff.locator('#toast')).toContainText('Avviso registrato nella casella');
+  await student.goto('/notifiche');
+  await expect(student.getByText(unique)).toBeVisible();
+  await expect(student.getByText('Messaggio di prova nella casella.')).toBeVisible();
+ }finally{await c1.close();await c2.close();}
+});

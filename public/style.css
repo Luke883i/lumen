@@ -61,3 +61,11 @@
 
 /* Native disclosure summary requires an explicit keyboard focus indicator. */
 .nav-more summary:focus-visible,.staff-workspaces a:focus-visible,.task-link:focus-visible{outline:3px solid var(--lumen-gold);outline-offset:3px}
+
+/* Compact live inbox marker: source is unread server rows, not OS push receipts. */
+.unread-count{display:inline-flex;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#176f65;color:white;align-items:center;justify-content:center;font-size:.72rem;font-weight:750;line-height:1;margin-inline-start:4px}
+.unread-count[hidden]{display:none}
+.staff-hold{min-height:0;padding:14px 16px;gap:12px}
+.staff-hold h3{font-size:1.04rem;margin-bottom:4px}
+.staff-hold .btn{flex-shrink:0}
+@media(max-width:600px){.staff-hold{align-items:flex-start;flex-wrap:wrap}.staff-hold .btn{width:100%}}

@@ -107,3 +107,7 @@ Implementazione in `public/projections.js`, consumata dalla UI LUMEN e inclusa n
 ## UX-S3: task IA (PR #13)
 
 Side-effect-free role/route selectors, ≤5 mobile primary links, separate Koha deep links, seven librarian workspaces with selected-area data fetching; RBAC and domain transitions unchanged. Unit tests and desktop/Android-emulated Chromium are local evidence, not real device or enterprise certification. See [UX_S3_IA.md](UX_S3_IA.md).
+
+## PR #14 E2E operational wiring
+
+Staff reservations are now a paged, staff-authorized read model for queued/ready holds; staff notifications are transactionally emitted by the hold creation. Foreground inbox badges/toasts derive from /api/notifications; OS push needs VAPID/HTTPS/permission/subscription and remains unproven on a physical device. Test suites must be green on the final exact SHA. See [E2E_REQUESTS_NOTIFICATIONS.md](E2E_REQUESTS_NOTIFICATIONS.md).

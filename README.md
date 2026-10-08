@@ -10,6 +10,14 @@ Le schermate mostrano provenienza, stato e possibilità di azione a partire dall
 
 Role-aware navigation now presents at most five primary destinations. A librarian chooses one task on /staff (circulation, catalog, acquisitions, people, communications, integrations), rather than scanning every form at once. Local and Koha services remain distinct. See [UX-S3 IA contract](docs/UX_S3_IA.md). Codespaces still uses npm run dev, Render still uses npm start.
 
+## Prenotazioni e notifiche E2E
+
+Banco → Circolazione presenta ora prenotazioni in coda e pronte, e la casella dei bibliotecari riceve gli avvisi delle nuove richieste. Mentre la pagina è aperta compaiono contatore e toast per nuovi messaggi.
+
+Il normale `npm run dev` avvia LUMEN. Per collaudare le notifiche esterne Chrome, usa separatamente `npm run dev:push`: genera chiavi locali VAPID ignorate da Git, avvia il server e richiede il consenso esplicito del browser nelle Impostazioni. I popup di sistema non sono garantiti e richiedono HTTPS, dispositivo e browser compatibili.
+
+Dettagli, falsificatori e test: [E2E_REQUESTS_NOTIFICATIONS.md](docs/E2E_REQUESTS_NOTIFICATIONS.md).
+
 ## R9b — Push identity and device revocation
 
 Web Push is now scoped to authenticated account and session. Browser logout and account replacement revoke old server enrollment; no account can silently take over another endpoint. Legacy push enrollments are cleared on migration and require user opt-in again. [Lifecycle and release gates](docs/PUSH_LIFECYCLE.md).
