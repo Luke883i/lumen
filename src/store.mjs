@@ -23,7 +23,7 @@ const ddl = [
   "PRAGMA journal_mode = WAL",
   "PRAGMA busy_timeout = 5000",
   "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('student','faculty','librarian')), passhash TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), csrf TEXT NOT NULL, expires_at TEXT NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), csrf TEXT NOT NULL, expires_at TEXT NOT NULL, auth_method TEXT NOT NULL DEFAULT 'local' CHECK(auth_method IN ('local','oidc')))",
   "CREATE TABLE IF NOT EXISTS books (id TEXT PRIMARY KEY, title TEXT NOT NULL, author TEXT NOT NULL, isbn TEXT NOT NULL DEFAULT '', subject TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS copies (id TEXT PRIMARY KEY, book_id TEXT NOT NULL REFERENCES books(id), barcode TEXT UNIQUE NOT NULL, shelf TEXT NOT NULL DEFAULT '')",
   "CREATE TABLE IF NOT EXISTS holds (id TEXT PRIMARY KEY, book_id TEXT NOT NULL REFERENCES books(id), user_id TEXT NOT NULL REFERENCES users(id), status TEXT NOT NULL CHECK(status IN ('queued','ready','fulfilled','cancelled')), created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
@@ -57,6 +57,9 @@ const ddl = [
   "CREATE TABLE IF NOT EXISTS idempotency (user_id TEXT NOT NULL, key TEXT NOT NULL, operation TEXT NOT NULL, payload_hash TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(user_id,key))",
   "CREATE TABLE IF NOT EXISTS audit_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT NOT NULL, operation TEXT NOT NULL, request_hash TEXT NOT NULL, receipt_hash TEXT NOT NULL, idempotency_key TEXT, occurred_at TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_events(occurred_at DESC)",
+  "CREATE TABLE IF NOT EXISTS oidc_flows (flow_hash TEXT PRIMARY KEY, state_hash TEXT NOT NULL UNIQUE, verifier TEXT NOT NULL, nonce TEXT NOT NULL, expires_at TEXT NOT NULL)",
+  "CREATE INDEX IF NOT EXISTS idx_oidc_flows_expiry ON oidc_flows(expires_at)",
+  "CREATE TABLE IF NOT EXISTS oidc_bindings (user_id TEXT PRIMARY KEY REFERENCES users(id), issuer TEXT NOT NULL, subject TEXT NOT NULL, linked_by TEXT NOT NULL REFERENCES users(id), linked_at TEXT NOT NULL, UNIQUE(issuer,subject))",
   "CREATE TABLE IF NOT EXISTS koha_patron_mappings (user_id TEXT PRIMARY KEY REFERENCES users(id), koha_patron_id INTEGER NOT NULL UNIQUE, verified_by TEXT NOT NULL REFERENCES users(id), verified_at TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS koha_hold_attempts (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), patron_id INTEGER NOT NULL, biblio_id INTEGER NOT NULL, request_key TEXT NOT NULL, payload_hash TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('reserved','uncertain','succeeded','rejected')), receipt_json TEXT, error_code TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(user_id,request_key))",
   "CREATE INDEX IF NOT EXISTS idx_koha_attempt_status ON koha_hold_attempts(state,created_at)",
@@ -77,6 +80,10 @@ export function openStore(path = './data/lumen.sqlite') {
   if (path !== ':memory:') mkdirSync(dirname(resolve(path)), { recursive: true });
   const db = new DatabaseSync(path);
   for (const sql of ddl) db.exec(sql);
+  // Existing R1–R5 databases predate the auth_method column.
+  // Migrate with a backward-compatible, explicit local default.
+  if(!db.prepare('PRAGMA table_info(sessions)').all().some(x=>x.name==='auth_method'))
+    db.exec("ALTER TABLE sessions ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'local' CHECK(auth_method IN ('local','oidc'))");
   if (!db.prepare("SELECT 1 FROM metadata WHERE key='catalog_fts_v1'").get()) {
     db.exec('BEGIN IMMEDIATE');
     try {

@@ -8,6 +8,7 @@ import { makeKoha } from './koha.mjs';
 import { createKohaCirculation } from './koha-circulation.mjs';
 import { createKohaLoans } from './koha-loans.mjs';
 import { createKohaReturns } from './koha-returns.mjs';
+import { createOidc } from './oidc.mjs';
 
 const s=openStore(process.env.LUMEN_DB_PATH || './data/lumen.sqlite');
 bootstrap(s);
@@ -16,6 +17,7 @@ const koha=makeKoha(process.env);
 const kohaCirculation=createKohaCirculation(s,koha,process.env);
 const kohaLoans=createKohaLoans(s,koha,process.env);
 const kohaReturns=createKohaReturns(s,koha,process.env);
+const oidc=createOidc(s,process.env);
 const publicDir=resolve(fileURLToPath(new URL('../public/', import.meta.url)));
 const port=Number(process.env.PORT || 3000);
 const prod=process.env.NODE_ENV==='production';
@@ -24,6 +26,7 @@ const json=(res,status,data,headers={})=>{res.writeHead(status,{'Content-Type':'
 const respond=(res,data,status=200)=>json(res,status,data);
 const cookieToken=req=>{const raw=req.headers.cookie||'';const match=raw.match(/(?:^|;\s*)lumen_session=([^;]+)/);return match?decodeURIComponent(match[1]):'';};
 const cookieAttrs=(maxAge)=>'Path=/; HttpOnly; SameSite=Lax; '+(prod?'Secure; ':'')+'Max-Age='+maxAge;
+const flowCookie=(req)=>{const match=(req.headers.cookie||'').match(/(?:^|;\s*)lumen_oidc_flow=([^;]+)/);return match?decodeURIComponent(match[1]):'';};
 const pathId=(path,prefix,suffix='')=>path.startsWith(prefix)&&path.endsWith(suffix)?decodeURIComponent(path.slice(prefix.length,path.length-suffix.length)):null;
 const readJson=async req=>{
   if(!(req.headers['content-type']||'').toLowerCase().startsWith('application/json')) throw new Failure(415,'JSON_REQUIRED','Invia JSON');
@@ -67,7 +70,7 @@ const getPublic=async(path,res)=>{
   res.end(file);
 };
 
-export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCirculationApi=kohaCirculation, kohaLoansApi=kohaLoans, kohaReturnsApi=kohaReturns }={}) {
+export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCirculationApi=kohaCirculation, kohaLoansApi=kohaLoans, kohaReturnsApi=kohaReturns, oidcApi=oidc }={}) {
   return async (req,res)=>{
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
@@ -78,26 +81,54 @@ export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCircul
       const url=new URL(req.url,'http://localhost');
       const path=url.pathname,method=req.method;
       if(path==='/api/health'&&method==='GET') return respond(res,{status:'ok',db:!!database.get('SELECT 1 ok')?.ok});
+      if(method==='GET'&&path==='/api/auth/oidc/start'){
+        const start=await oidcApi.start();
+        res.writeHead(302,{'Location':start.redirect,'Cache-Control':'no-store',
+          'Set-Cookie':'lumen_oidc_flow='+encodeURIComponent(start.flow)+'; '+cookieAttrs(300)});
+        return res.end();
+      }
+      if(method==='GET'&&path==='/api/auth/oidc/callback'){
+        // The authorization code is exchanged server-side; URL query is not logged or returned.
+        try{
+          const session=await oidcApi.finish(flowCookie(req),url.searchParams.get('state'),url.search);
+          res.writeHead(303,{'Location':'/me','Cache-Control':'no-store',
+            'Set-Cookie':['lumen_session='+encodeURIComponent(session.token)+'; '+cookieAttrs(43200),
+              'lumen_oidc_flow=; '+cookieAttrs(0)]});
+          return res.end();
+        }catch(error){
+          res.writeHead(303,{'Location':'/accedi?auth_error=1','Cache-Control':'no-store',
+            'Set-Cookie':'lumen_oidc_flow=; '+cookieAttrs(0)});
+          return res.end();
+        }
+      }
       if(!path.startsWith('/api/')) {
         if(method!=='GET'&&method!=='HEAD') throw new Failure(405,'METHOD_NOT_ALLOWED','Metodo non consentito');
         return await getPublic(path,res);
       }
       const idempotencyKey=req.headers['idempotency-key']||null;
       const token=cookieToken(req);
-      const user=api.current(token);
+      const rawUser=api.current(token);
+      // Enabling SSO-only invalidates old password-authenticated sessions
+      // without destroying independently authenticated OIDC sessions.
+      const user=oidcApi.only&&rawUser?.auth_method!=='oidc'?null:rawUser;
       if(method!=='GET'&&method!=='HEAD') {
         originGuard(req);
         if(path!=='/api/login') requireCsrf(req,user);
       }
       if(method==='GET'&&path==='/api/me') return respond(res,{user:user?{id:user.id,email:user.email,name:user.name,role:user.role}:null,csrf:user?.csrf||null});
       if(method==='POST'&&path==='/api/login') {
+        if(oidcApi.only)throw new Failure(403,'OIDC_ONLY','Accesso locale disabilitato: usa SSO');
         const b=await readJson(req);
         loginLimit(req,b.email);
         const result=api.login(b.email,b.password);
         return json(res,200,{user:result.user,csrf:result.csrf},{'Set-Cookie':'lumen_session='+encodeURIComponent(result.token)+'; '+cookieAttrs(43200)});
       }
       if(method==='POST'&&path==='/api/logout'){api.logout(token);return json(res,200,{ok:true},{'Set-Cookie':'lumen_session=; '+cookieAttrs(0)});}
-      if(method==='GET'&&path==='/api/config') return respond(res,{koha:{configured:kohaApi.configured,mode:kohaLoansApi.enabled?'circulation_pilot':kohaCirculationApi.enabled?'patron_holds_pilot':'read_only',holdsEnabled:kohaCirculationApi.enabled,loansEnabled:kohaLoansApi.enabled,returnsEnabled:kohaReturnsApi.enabled}});
+      if(method==='GET'&&path==='/api/config') return respond(res,{identity:{oidcEnabled:oidcApi.enabled,oidcOnly:oidcApi.only},koha:{configured:kohaApi.configured,mode:kohaLoansApi.enabled?'circulation_pilot':kohaCirculationApi.enabled?'patron_holds_pilot':'read_only',holdsEnabled:kohaCirculationApi.enabled,loansEnabled:kohaLoansApi.enabled,returnsEnabled:kohaReturnsApi.enabled}});
+      if(method==='POST'&&path==='/api/staff/oidc/bind'){
+        const body=await readJson(req);
+        return respond(res,oidcApi.bind(user,body.userId,body.subject));
+      }
       if(method==='GET'&&path==='/api/staff/koha/returns') return respond(res,kohaReturnsApi.list(user));
       if(method==='POST'&&path==='/api/staff/koha/returns/prepare'){
         const body=await readJson(req);

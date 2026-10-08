@@ -38,6 +38,19 @@ if(process.env.KOHA_RETURNS_ENABLED==='1'){
     !!(process.env.KOHA_BASE_URL&&process.env.KOHA_CLIENT_ID&&process.env.KOHA_CLIENT_SECRET),
     'Return confirmation requires configured Koha loans and OAuth2 credentials');
 }
+const oidcKeys=['OIDC_ISSUER','OIDC_CLIENT_ID','OIDC_CLIENT_SECRET','OIDC_REDIRECT_URI'];
+const oidcPresent=oidcKeys.filter(k=>!!process.env[k]);
+if(oidcPresent.length || process.env.OIDC_ONLY==='1'){
+  record('oidc-complete-config',oidcPresent.length===oidcKeys.length,
+    'Institutional OIDC requires issuer, client, secret and exact callback simultaneously');
+  let valid=false;
+  try {
+    const issuer=new URL(process.env.OIDC_ISSUER||''), redirect=new URL(process.env.OIDC_REDIRECT_URI||'');
+    valid=issuer.protocol==='https:'&&(!prod || redirect.protocol==='https:')&&
+      redirect.pathname==='/api/auth/oidc/callback'&&!redirect.username&&!redirect.password&&!redirect.search;
+  }catch{}
+  record('oidc-urls-valid',valid,'Explicit HTTPS issuer and callback registered with the IdP');
+}
 const path=process.env.LUMEN_DB_PATH;
 if(path&&existsSync(path)){
   try{
@@ -48,13 +61,19 @@ if(path&&existsSync(path)){
       hasDemo=!!db.prepare("SELECT 1 FROM users WHERE email IN ('student@lumen.local','faculty@lumen.local','librarian@lumen.local') LIMIT 1").get();
       hasDemo ||= db.prepare("SELECT value FROM metadata WHERE key='demo_dataset'").get()?.value==='1';
     }catch(e){if(prod)throw e;}
-    db.close();
     record('database-integrity',integrity==='ok','SQLite PRAGMA quick_check');
     if(prod)record('database-not-demo',!hasDemo,'No demonstration account or demo marker in persistent DB');
+    if(process.env.OIDC_ONLY==='1'){
+      const ready=!!db.prepare("SELECT 1 FROM oidc_bindings b JOIN users u ON u.id=b.user_id WHERE u.role='librarian' AND u.active=1 LIMIT 1").get();
+      record('oidc-admin-mapped',ready,'Avoid SSO-only lockout: at least one active mapped librarian required');
+    }
+    db.close();
   }catch(e){record('database-readiness',false,'Could not safely verify local database: '+e.code);}
 }
+if(prod&&process.env.OIDC_ONLY==='1'&&(!path||!existsSync(path)))
+  record('oidc-admin-mapped',false,'SSO-only must not start without a persisted mapped active librarian');
 const report={product:'LUMEN',gate:'standalone_release_preflight',time:new Date().toISOString(),node:process.version,
   revision:process.env.GIT_SHA||'unbound',
-  checks,openEnterpriseGates:['OIDC institution integration','Koha live circulation','2k VU on target hardware with writes and soak','HA and recovery drills','independent security review']};
+  checks,openEnterpriseGates:['Live institutional IdP signature/conformance and subject lifecycle','Koha live circulation','2k VU on target hardware with writes and soak','HA and recovery drills','independent security review']};
 console.log(JSON.stringify(report,null,2));
 if(checks.some(x=>x.status==='FAIL'))process.exitCode=1;

@@ -71,3 +71,9 @@ R4 must not be marketed as enterprise ILS production ready even after normal rev
 ## R5 draft — return evidence, not remote check-in
 
 Implemented as a separate OFF-by-default R5 feature: staff-only return ticket preparation, positive Koha history reconciliation and one audited receipt, with test-only Koha mocks. Never mark a return complete on a missing active checkout or 404. External check-in must still happen in Koha's own circulation workflow. The R5 live read-only smoke is not executed without fixture credentials. Enterprise release class remains BLOCKED.
+
+## R6 draft: institutional OIDC (feature flagged)
+
+OpenID Connect Authorization Code+PKCE with server-side state/nonce validation uses pinned openid-client 6.8.8. OIDC subject mapping is explicit, unique, issuer-scoped and not self-provisioned. Database RBAC remains authoritative. Test suite mocks signed-claim output of client, preserving state and replay checks.
+
+Live institutional IdP interoperability, signature verification using REAL IdP JWKS, user lifecycle alignment, front/back-channel logout, session revocation across services, accessibility and rollout are OPEN. R6 is NOT enterprise identity certification.

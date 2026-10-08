@@ -61,6 +61,12 @@ The workflow is disabled by default and requires `KOHA_RETURNS_ENABLED=1` togeth
 
 Check a controlled live Koha fixture without changing library data: `GIT_SHA=$(git rev-parse HEAD) npm run koha:return-smoke`. No live production validation has been executed.
 
+## R6 optional institutional Single Sign-On
+
+R6 adds a feature-flagged OpenID Connect authorization-code login with PKCE. A librarian maps each verified provider subject to an existing account; account roles always come from LUMEN, never provider group claims. No new users or privileges are created automatically. The optional OIDC_ONLY=1 setting disables local-password login after the staff setup has been proven.
+
+See [OIDC.md](docs/OIDC.md) for configuration, staff binding, staging tests and production blockers. Without four required server-side OIDC secrets/URLs, the normal R1–R5 local login remains unchanged.
+
 ## Non-negotiable architectural boundaries
 
 - **Standalone mode**: self-contained lightweight single-library circulation, not a full ILS. It does **not** claim MARC cataloguing, federated OPAC, inter-library lending, fines, serials or Koha parity.
