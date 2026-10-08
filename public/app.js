@@ -1,4 +1,4 @@
-import {libraryCopy,installExperience,pushExperience,actionConfirmation} from './experience.js';
+import {libraryCopy,installExperience,pushExperience,actionConfirmation,localAvailability,localHoldResult} from './experience.js';
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
 const dialog=document.querySelector('#lumen-dialog');
@@ -105,15 +105,15 @@ function header(){
 }
 function footer(){return '<footer class="shell footer"><div class="row"><span><strong>LUMEN</strong> · Il tuo spazio per la conoscenza</span><span>Servizi bibliotecari · <a data-nav href="/installazione">Installa app</a> · <a data-nav href="/impostazioni">Impostazioni</a></span></div></footer>';}
 function bookCard(b){
-  const availability=b.available>0?badge(b.available+' disponibil'+(b.available===1?'e':'i')):badge('In attesa','warn');
+  const availabilityState=localAvailability(b.available);const availability=badge(availabilityState.label,availabilityState.status==='available'?'':'warn');
   return '<article class="card book-card"><div class="cover">'+bookIcon+'</div><div style="flex:1;min-width:0"><h3><a data-nav href="/catalogo/'+esc(b.id)+'">'+t(b.title)+'</a></h3><p class="muted" style="margin-bottom:9px">'+t(b.author)+'<br><small>'+t(b.subject)+' · '+t(b.isbn||'ISBN non inserito')+'</small></p><div class="row">'+availability+'<a class="btn small alt" data-nav href="/catalogo/'+esc(b.id)+'">Dettagli →</a></div></div></article>';
 }
 async function home(){
   const books=await api('/api/books');
   return '<section class="hero"><div><p class="eyebrow">La tua biblioteca, ovunque</p><h1>Ogni libro apre una possibilità.</h1><p>'+t(libraryCopy.services)+'</p>'+formSearch()+'<p class="fine" style="margin-top:16px"><a data-nav href="/installazione" style="color:#f0d68d;text-decoration:underline">Porta LUMEN sul tuo dispositivo →</a></p>'+'</div><div class="hero-art">'+bookIcon+'</div></section>'
   +'<section class="section"><div class="section-head"><h2>Un luogo, tanti servizi</h2></div><div class="grid">'
-  +'<article class="card service-card">'+ic('search')+'<h3>Esplora il patrimonio</h3><p class="muted">Cerca per autore, titolo, ISBN o materia e controlla le copie disponibili.</p></article>'
-  +'<article class="card service-card">'+ic('clock')+'<h3>Prenota senza attese</h3><p class="muted">Richiedi un volume e segui lo stato della coda dalla tua area personale.</p></article>'
+  +'<article class="card service-card">'+ic('search')+'<h3>Esplora il patrimonio</h3><p class="muted">Cerca per autore, titolo, ISBN o materia e verifica la disponibilità nel catalogo LUMEN.</p></article>'
+  +'<article class="card service-card">'+ic('clock')+'<h3>Segui le prenotazioni</h3><p class="muted">Invia una prenotazione e verifica se il volume è pronto o in coda.</p></article>'
   +'<article class="card service-card">'+ic('cap')+'<h3>Sostieni la ricerca</h3><p class="muted">I docenti possono proporre nuovi acquisti e seguirne l'+'&#39;'+'iter.</p></article></div></section>'
   +'<section class="section"><div class="section-head"><h2>Dal catalogo</h2><a class="btn alt small" data-nav href="/catalogo">Vedi tutti →</a></div><div class="grid">'+(books.length?books.slice(0,3).map(bookCard).join(''):empty('Il catalogo sarà disponibile a breve.'))+'</div></section>'
   +'<section class="section"><div class="card"><h2>La biblioteca e LUMEN</h2><p>'+t(libraryCopy.context)+'</p><p>LUMEN è il punto di accesso digitale ai servizi bibliotecari: non sostituisce i sistemi gestionali della biblioteca e mantiene separati gli esiti delle integrazioni esterne.</p><p class="fine">Sedi, orari, contatti e condizioni di prestito saranno indicati dalla biblioteca prima della pubblicazione ufficiale.</p></div></section>';
@@ -127,16 +127,17 @@ async function catalog(){
 async function bookDetail(){
   const id=location.pathname.split('/')[2];
   const b=await api('/api/books/'+encodeURIComponent(id));
+  const localState=localAvailability(b.available);
   return '<div class="page-top"><a class="fine" data-nav href="/catalogo">← Torna al catalogo</a></div>'
-  +'<div class="layout section"><article class="card"><div class="book-card"><div class="cover" style="flex-basis:120px;height:160px">'+bookIcon+'</div><div><p class="eyebrow">Scheda bibliografica</p><h1 style="font-size:2rem">'+t(b.title)+'</h1><p>'+t(b.author)+'</p><p class="muted">'+t(b.subject)+' · ISBN '+t(b.isbn||'non presente')+'</p>'+badge(b.available>0?b.available+' copie disponibili':'Disponibilità in attesa',b.available?'':'warn')+'</div></div><hr class="divider"><p>'+t(b.description||'Descrizione non disponibile.')+'</p></article>'
-  +'<aside class="card"><h2>Richiedi il volume</h2><p class="muted">Copie totali: '+b.copies+' · In prestito: '+b.borrowed+' · Prenotate: '+b.reserved+' · In coda: '+b.queue+'</p>'
-  +(state.user?'<form data-form="hold"><input type="hidden" name="bookId" value="'+esc(b.id)+'"><button class="btn" type="submit">Richiedi / prenota</button></form>':'<a class="btn" data-nav href="/accedi">Accedi per prenotare</a>')
+  +'<div class="layout section"><article class="card"><div class="book-card"><div class="cover" style="flex-basis:120px;height:160px">'+bookIcon+'</div><div><p class="eyebrow">Scheda bibliografica</p><h1 style="font-size:2rem">'+t(b.title)+'</h1><p>'+t(b.author)+'</p><p class="muted">'+t(b.subject)+' · ISBN '+t(b.isbn||'non presente')+'</p>'+badge(localState.label,localState.status==='available'?'':'warn')+'</div></div><hr class="divider"><p>'+t(b.description||'Descrizione non disponibile.')+'</p></article>'
+  +'<aside class="card"><h2>Prenota il titolo</h2><p class="muted">Copie totali: '+b.copies+' · In prestito: '+b.borrowed+' · Prenotate: '+b.reserved+' · In coda: '+b.queue+'</p>'
+  +(state.user?'<form data-form="hold"><input type="hidden" name="bookId" value="'+esc(b.id)+'"><button class="btn" type="submit">Invia prenotazione</button></form>':'<a class="btn" data-nav href="/accedi">Accedi per prenotare</a>')
   +'<p class="fine" style="margin-top:14px">Le assegnazioni rispettano la disponibilità e l'+'&#39;'+'ordine delle richieste. Il ritiro si perfeziona al banco bibliotecario.</p></aside></div>';
 }
 async function myLibrary(){
   const [holds,loans]=await Promise.all([api('/api/holds'),api('/api/loans')]);
   const active=loans.filter(l=>l.status==='active'),pending=holds.filter(h=>['queued','ready'].includes(h.status));
-  return sectionTitle('La mia biblioteca','Prestiti, prenotazioni e scadenze sempre sotto controllo.')
+  return sectionTitle('La mia biblioteca','Consulta lo stato dei prestiti e delle prenotazioni LUMEN.')
   +'<div class="grid section"><div class="card"><p class="label">Prestiti attivi</p><p class="metric">'+active.length+'</p></div><div class="card"><p class="label">Prenotazioni aperte</p><p class="metric">'+pending.length+'</p></div><div class="card"><p class="label">Prossima scadenza</p><p class="metric" style="font-size:1.35rem">'+(active.length?humanDate(active.map(l=>l.due_at).sort()[0]):'Nessuna')+'</p></div></div>'
   +'<section class="section"><h2>Prestiti</h2><div class="list">'+(loans.length?loans.map(l=>'<article class="card row space"><div><h3>'+t(l.title)+'</h3><p class="fine">Scadenza '+humanDate(l.due_at)+' · '+t(l.barcode)+'</p>'+badge(l.status==='active'?'Attivo':'Restituito',l.status==='active'?'':'gray')+'</div>'+(l.status==='active'&&l.renewal_count<1?btn('Rinnova','renew',l.id,'alt'):'')+'</article>').join(''):empty('Non hai ancora prestiti.'))+'</div></section>'
   +'<section class="section"><h2>Prenotazioni</h2><div class="list">'+(holds.length?holds.map(h=>'<article class="card row space"><div><h3>'+t(h.title)+'</h3><p class="fine">Richiesta '+humanDate(h.created_at)+'</p>'+badge({queued:'In coda',ready:'Pronto al ritiro',fulfilled:'Soddisfatta',cancelled:'Annullata'}[h.status]||h.status,h.status==='queued'?'warn':h.status==='cancelled'?'gray':'')+'</div>'+(['queued','ready'].includes(h.status)?btn('Annulla','cancel-hold',h.id,'ghost'):'')+'</article>').join(''):empty('Nessuna prenotazione.'))+'</div></section>';
@@ -416,7 +417,7 @@ document.addEventListener('submit',async event=>{
     }
     if(action==='change-password'){await api('/api/change-password','POST',data);state.user=null;state.csrf=null;navigate('/accedi');message('Password aggiornata. Effettua nuovamente l’accesso.');return;}
     if(action==='login'){const r=await api('/api/login','POST',data);state.user=r.user;state.csrf=r.csrf;navigate(r.user.role==='librarian'?'/staff':'/me');message('Accesso effettuato');return;}
-    if(action==='hold')await api('/api/holds','POST',data);
+    if(action==='hold'){const receipt=await api('/api/holds','POST',data);const result=localHoldResult(receipt);message(result.message,result.epistemic==='unknown');await render();return;}
     if(action==='suggest')await api('/api/suggestions','POST',data);
     if(action==='book'){data.copies=Number(data.copies);await api('/api/staff/books','POST',data);}
     if(action==='user')await api('/api/staff/users','POST',data);
