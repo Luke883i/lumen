@@ -104,7 +104,7 @@ test('manifest identity, service-worker precache and semantic UI routes are cohe
  assert.equal(manifest.id,'/');
  assert.equal(manifest.display,'standalone');
  assert.equal(manifest.start_url,'/');
- assert.equal(manifest.theme_color,'#10243a');
+ assert.equal(manifest.theme_color,'#0b2550');
  for(const size of [192,512])assert.ok(manifest.icons.some(icon=>icon.sizes===size+'x'+size&&icon.type==='image/png'));
  for(const shortcut of manifest.shortcuts)assert.ok(shortcut.url.startsWith('/'));
  const sw=load('public/sw.js'),app=load('public/app.js'),index=load('public/index.html');
