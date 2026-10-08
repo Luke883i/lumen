@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.16.0 <25.0.0"
+    "node": ">=24.0.0 <25.0.0"
   },
   "scripts": {
     "dev": "LUMEN_DEMO=1 NODE_ENV=development node --watch src/server.mjs",
@@ -16,7 +16,10 @@
     "koha:smoke": "node scripts/koha-smoke.mjs",
     "koha:loans-smoke": "node scripts/koha-loans-smoke.mjs",
     "koha:return-smoke": "node scripts/koha-return-smoke.mjs",
-    "oidc:smoke": "node scripts/oidc-smoke.mjs"
+    "oidc:smoke": "node scripts/oidc-smoke.mjs",
+    "prestart": "node scripts/preflight.mjs",
+    "verify:boot": "node scripts/verify-boot.mjs",
+    "verify:deploy": "node scripts/verify-deploy.mjs"
   },
   "dependencies": {
     "web-push": "^3.6.7",
