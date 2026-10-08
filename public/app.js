@@ -193,7 +193,7 @@ async function kohaPending(){
   if(!isStaff())return forbidden();
   const pending=await api('/api/staff/koha/pending');
   return sectionTitle('Operazioni Koha da riconciliare','L’esito remoto può essere stato registrato nonostante un timeout. Nessun retry automatico.')
-    +'<div class="list section">'+(pending.length?pending.map(x=>'<article class="card"><h3>Record Koha '+Number(x.biblio_id)+'</h3><p class="fine">Patron #'+Number(x.patron_id)+' · Stato: '+t(x.state)+' · Errore: '+t(x.error_code||'non determinato')+'</p><p>Verifica manualmente su Koha prima di ulteriori operazioni.</p></article>').join(''):empty('Nessuna operazione incerta.'))+'</div>';
+    +'<div class="list section">'+(pending.length?pending.map(x=>'<article class="card"><h3>Record Koha '+Number(x.biblio_id)+'</h3><p class="fine">Patron #'+Number(x.patron_id)+' · Stato: '+t(x.state)+' · Errore: '+t(x.error_code||'non determinato')+'</p><p>Verifica il record su Koha, poi inserisci il suo identificativo autentico.</p><form class="form" data-form="koha-reconcile"><input type="hidden" name="attemptId" value="'+esc(x.id)+'">'+field('ID prenotazione Koha','holdId','ID confermato',true,'number')+'<button class="btn small" type="submit">Verifica e riconcilia</button></form></article>').join(''):empty('Nessuna operazione incerta.'))+'</div>';
 }
 async function view(){
   const path=location.pathname;
@@ -258,6 +258,11 @@ document.addEventListener('submit',async event=>{
       message('Koha ha confermato la prenotazione #'+receipt.holdId);
       navigate('/koha/me');
       return;
+    }
+    if(action==='koha-reconcile'){
+      const receipt=await api('/api/staff/koha/reconcile','POST',data);
+      message('Ricevuta Koha #'+receipt.holdId+' riconciliata');
+      await render();return;
     }
     if(action==='koha-bind'){
       await api('/api/staff/koha/bind','POST',data);
