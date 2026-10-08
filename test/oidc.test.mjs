@@ -11,7 +11,7 @@ function setup(overrides={}){
  const librarian=s.get("SELECT * FROM users WHERE role='librarian'");
  const student=s.get("SELECT * FROM users WHERE role='student'");
  const faculty=s.get("SELECT * FROM users WHERE role='faculty'");
- const calls={code:0},state={subject:'subject-123',email:student.email,verified:true,role:'librarian'};
+ const calls={code:0,nonce:null},state={subject:'subject-123',email:student.email,verified:true,role:'librarian'};
  const library={
   randomPKCECodeVerifier:()=> 'unique-verifier-code',
   randomNonce:()=> 'fixture-nonce',
@@ -20,12 +20,12 @@ function setup(overrides={}){
   async discovery(){return {serverMetadata:()=>({issuer:environment.OIDC_ISSUER})};},
   buildAuthorizationUrl(config,params){
     const url=new URL('https://idp.example.edu/authorize');
-    Object.entries(params).forEach(([key,value])=>url.searchParams.set(key,value));return url;
+    Object.entries(params).forEach(([key,value])=>url.searchParams.set(key,value));calls.nonce=params.nonce;return url;
   },
   async authorizationCodeGrant(config,url,checks){
     calls.code++;
     assert.equal(checks.pkceCodeVerifier,'unique-verifier-code');
-    assert.equal(checks.expectedNonce,'fixture-nonce');
+    assert.equal(checks.expectedNonce,calls.nonce);
     assert.equal(checks.expectedState,url.searchParams.get('state'));
     assert.equal(checks.idTokenExpected,true);
     return {getValidatedIdTokenClaims:()=>({
