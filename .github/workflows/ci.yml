@@ -28,6 +28,8 @@ jobs:
         run: |
           { echo '### Syntax CI check diagnostics · ${{ github.sha }}'; echo '~~~text'; tail -n 65 /tmp/lumen-check.log 2>/dev/null || true; echo '~~~'; } > /tmp/ux-s2-check.md
           gh pr comment "$PR_NUMBER" --body-file /tmp/ux-s2-check.md
+      - name: License provenance and locked SPDX inventory
+        run: npm run check:licenses
       - run: npm run preflight
       - name: Domain, HTTP and Koha contract tests
         run: |
