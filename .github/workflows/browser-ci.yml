@@ -40,13 +40,14 @@ jobs:
         run: |
           set -o pipefail
           npm run test:browser 2>&1 | tee /tmp/lumen-browser-acceptance.log
-      - name: Expose falsification diagnostics in PR #9
-        if: failure() && github.event_name == 'push'
+      - name: Publish browser falsification in current PR
+        if: failure() && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          { echo '### R9 real-browser falsification · ${{ github.sha }}'; echo '~~~text'; tail -n 110 /tmp/lumen-browser-acceptance.log 2>/dev/null || true; echo '~~~'; } > /tmp/r9-diagnostics.md
-          gh pr comment 9 --body-file /tmp/r9-diagnostics.md
+          { echo '### Browser acceptance failure at ${{ github.sha }}'; echo '~~~text'; tail -n 140 /tmp/lumen-browser-acceptance.log 2>/dev/null || true; echo '~~~'; } > /tmp/lumen-browser-errors.md
+          gh pr comment "$PR_NUMBER" --body-file /tmp/lumen-browser-errors.md
       - name: Save failing browser trace and screenshot evidence
         if: failure()
         uses: actions/upload-artifact@v4

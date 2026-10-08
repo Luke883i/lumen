@@ -6,13 +6,17 @@ LUMEN is a deployable, installable library-services PWA for patrons, faculty and
 
 Web Push is now scoped to authenticated account and session. Browser logout and account replacement revoke old server enrollment; no account can silently take over another endpoint. Legacy push enrollments are cleared on migration and require user opt-in again. [Lifecycle and release gates](docs/PUSH_LIFECYCLE.md).
 
+## UX-S1 — Precise library status and action language
+
+The [semantic UX lattice](docs/UX_SEMANTIC_LATTICE.md) and [business copy/authority audit](docs/UX_COPY_AUDIT.md) define source-bound statuses, clear CTAs and the remaining visual recomposition slices. LUMEN now differentiates local book availability, queued vs ready reservations, approved vs ordered proposals and local server acknowledgements; this does not alter Koha authority. Follow-on UX-S2...S6 handle task projections, navigation, visual compression, CTA quality and composition audit. **Codespaces still runs with `npm run dev`; Render still uses `npm start`.**
+
 ## LUMEN experience and installable PWA
 
 The [product lattice](docs/PRODUCT_LATTICE.md) and [real-device acceptance matrix](docs/UX_ACCEPTANCE.md) specify the minimal R8–R13 sequence to move from a polished pilot to an evidence-backed enterprise release. R8 introduces LUMEN design tokens, a public **/installazione** guide for Android Chrome and Windows Chrome/Edge, consent-aware Chrome notifications, a native keyboard-accessible confirmation dialog and honest guest/student/faculty/librarian copy. No UI framework or extra package is required.
 
 Use `npm run dev` in a fresh Codespace and open port 3000; on an HTTPS site, follow **Installa app** in LUMEN or in the browser menu. The resulting PWA opens in a standalone browser window, not as a native APK. Notification delivery requires configured VAPID secrets, explicit user permission, compatible browser/OS support, and remains best-effort; the inbox is always authoritative.
 
-**Browser acceptance:** PR #9 adds test-only, isolated Playwright Chromium coverage for desktop and Android emulation. After `npm --prefix browser ci` and `npm --prefix browser exec -- playwright install chromium`, run `npm run test:browser`. This is optional QA; **`npm run dev` remains the sole command needed to use LUMEN in a fresh Codespace**. See [browser/README.md](browser/README.md).
+**Browser acceptance:** R9 includes test-only, isolated Playwright Chromium coverage for desktop and Android emulation. After `npm --prefix browser ci` and `npm --prefix browser exec -- playwright install chromium`, run `npm run test:browser`. This is optional QA; **`npm run dev` remains the sole command needed to use LUMEN in a fresh Codespace**. See [browser/README.md](browser/README.md).
 
 **User acceptance still to run:** physical Chrome Android/Windows installation, system notification delivery/tap, screen-reader checks, real Render canary with persistent-state restore, Koha/IdP integration and 2,000 concurrent users. Automated Chromium emulation does not replace real-device evidence.
 

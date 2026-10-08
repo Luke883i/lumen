@@ -13,7 +13,7 @@ npm --prefix browser exec -- playwright install chromium
 npm run test:browser
 ```
 
-`npm run dev` remains the only command to **use** LUMEN. Browser tests are an optional verification command and automatically start their own isolated port 3219 with in-memory demo data. No Render, Koha, IdP, VAPID or real patron credentials are used.
+`npm run dev` remains the only command to **use** LUMEN. Browser tests are an optional verification command and automatically start separate ports 3219 (desktop) and 3220 (Android emulation), each with its own in-memory demo data. No Render, Koha, IdP, VAPID or real patron credentials are used.
 
 CI installs browser dependencies and OS libraries for Chromium. The suite executes desktop Chrome-compatible Chromium and Android **emulation**, and verifies anonymous discovery/search, the installation prompt state, student hold/dialog behavior, faculty acquisitions, librarian navigation, notification-unconfigured fallback, mobile overflow and offline shell.
 
@@ -23,7 +23,13 @@ These tests cannot prove Android launcher installation, Chrome OS permission del
 
 - UI actions are exercised through browser events and authenticated HTTP, never through direct service function calls.
 - Background server uses `LUMEN_DB_PATH=:memory:` so tests cannot mutate a real library database.
-- Only two Playwright browser emulations run, serialized to avoid shared fixture races.
+- Only two Playwright browser emulations run, with isolated server/database state per project.
 - `beforeinstallprompt` is simulated **only** to test fallback messaging and CTA state, not to assert OS installation.
 - Real push permission and VAPID delivery are **external blockers**. The suite proves that unconfigured push does not solicit permission.
 - Failure includes test traces; no credentials, cookies or patron metadata from production are introduced.
+
+## UX-S1 receipt-truth regression
+
+Browser assertions now compare the hold creation HTTP **201** response's `ready`/`queued` status with the actual LUMEN confirmation shown to the end user; no test hardcodes generic success. Desktop and Android-emulated Playwright projects each boot a separate in-memory database, so an assertion failure cannot contaminate the other platform's reservation lifecycle. The standalone book-detail screen also asserts the unambiguous **Invia prenotazione** CTA and excludes the misleading "Disponibilità in attesa" label. The independently reviewed business-language contract is in [UX_COPY_AUDIT.md](../docs/UX_COPY_AUDIT.md).
+
+A successful browser run is still not evidence of an Android OS launcher installation or a production Render/Koha/IdP deployment.

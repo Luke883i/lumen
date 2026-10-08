@@ -1,4 +1,4 @@
-# LUMEN release gates — authoritative R2 status
+# LUMEN release gates — versioned implementation and evidence ledger
 
 ## Objective
 

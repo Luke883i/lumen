@@ -116,3 +116,49 @@ test('manifest identity, service-worker precache and semantic UI routes are cohe
  const css=load('public/style.css');
  assert.equal(/var\(--lumen-[^)]+\)[a-z0-9]+/.test(css),false,'no invalid concatenated CSS token');
 });
+
+test('availability statuses do not invent a queue or unknown stock',async()=>{
+ const {localAvailability}=await import('../public/experience.js');
+ for(const v of [null,undefined,NaN,1.5,-1,'0'])
+   assert.equal(localAvailability(v).status,'unknown');
+ assert.equal(localAvailability(0).label,'Nessuna copia disponibile ora');
+ assert.equal(localAvailability(1).label,'1 copia disponibile');
+ assert.equal(localAvailability(3).label,'3 copie disponibili');
+});
+test('hold receipt disambiguates ready vs queued vs unverified',async()=>{
+ const {localHoldResult}=await import('../public/experience.js');
+ assert.match(localHoldResult({status:'ready'}).message,/pronta per il ritiro/i);
+ assert.match(localHoldResult({status:'queued'}).message,/in coda/i);
+ for(const v of [null,undefined,{}, {status:'pending'}])
+   assert.equal(localHoldResult(v).epistemic,'unknown');
+});
+
+test('local statuses never label unsupported backend values as confirmed',async()=>{
+ const {localStatus}=await import('../public/experience.js');
+ const states={
+   hold:{queued:'In coda',ready:'Pronto al ritiro',fulfilled:'Consegnata',cancelled:'Annullata'},
+   loan:{active:'In prestito',returned:'Restituito'},
+   suggestion:{pending:'In valutazione',approved:'Approvata',rejected:'Non accolta',ordered:'Ordinata'}
+ };
+ for(const [domain,values] of Object.entries(states)){
+   for(const [status,label] of Object.entries(values)){
+     const projection=localStatus(domain,status);
+     assert.equal(projection.label,label);
+     assert.equal(projection.epistemic,'supported');
+   }
+   for(const value of [null,undefined,'other','','approved-later']){
+     assert.equal(localStatus(domain,value).label,'Stato da verificare');
+     assert.equal(localStatus(domain,value).epistemic,'unknown');
+   }
+ }
+ assert.equal(localStatus('koha','active').epistemic,'unknown');
+});
+test('local action text does not imply remote push delivery or an unperformed loan',async()=>{
+ const {localActionFeedback}=await import('../public/experience.js');
+ assert.match(localActionFeedback('book'),/catalogo LUMEN/);
+ assert.match(localActionFeedback('checkout'),/Prestito registrato/);
+ assert.match(localActionFeedback('broadcast'),/casella avvisi/i);
+ assert.doesNotMatch(localActionFeedback('broadcast'),/notifica consegnata|push ricevuta/i);
+ for(const action of ['install','koha-hold','koha-checkout','unknown'])
+   assert.equal(localActionFeedback(action),null);
+});
