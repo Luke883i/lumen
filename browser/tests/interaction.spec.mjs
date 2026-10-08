@@ -15,10 +15,11 @@ async function openBook(page){
 
 test('UX-S5 stale GET result cannot overwrite the new route or keyboard focus',async({page})=>{
   await page.goto('/');
+  await expect(page.getByRole('heading',{name:'Ogni libro apre una possibilità.'})).toBeVisible();
   let release,blocked;
   const gate=new Promise(ok=>release=ok);
   const arrived=new Promise(ok=>blocked=ok);
-  await page.route('**/api/books',async route=>{
+  await page.route(/\/api\/books(?:\?|$)/,async route=>{
     if(new URL(route.request().url()).pathname!=='/api/books')return route.continue();
     blocked();
     await gate;await route.continue();
