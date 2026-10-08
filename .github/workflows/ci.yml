@@ -4,6 +4,7 @@ on:
   pull_request:
 permissions:
   contents: read
+  pull-requests: write
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -18,7 +19,16 @@ jobs:
       - run: npm run check
       - run: npm run preflight
       - name: Domain, HTTP and Koha contract tests
-        run: npm test
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee /tmp/lumen-test.log
+      - name: Publish failing test output on PR 3
+        if: failure() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo '### R3 test diagnostics · ${{ github.sha }}'; echo '~~~text'; tail -n 140 /tmp/lumen-test.log; echo '~~~'; } > /tmp/lumen-test-report.md
+          gh pr comment 3 --body-file /tmp/lumen-test-report.md
       - name: Start command and health probe
         env:
           NODE_ENV: test
