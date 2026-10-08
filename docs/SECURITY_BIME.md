@@ -45,7 +45,7 @@ References: [OWASP ASVS 5.0](https://owasp.org/projects/asvs), [OWASP API Top 10
 
 ## Residual risk and explicit acceptance debt
 
-- **SEC-R1 (open):** login limiter is in-memory, per-process and keyed partly by untrusted request metadata; it does not provide distributed WAF/bot mitigation or durable/account-wide throttling. Use a managed edge gateway and verify real-world behavior before exposure.
+- **SEC-R1 (partially mitigated):** high-cardinality login input can no longer grow the in-process limiter beyond 20,000 entries. The limiter is still per-process and keyed partly by request metadata: high-cardinality eviction and distributed credential stuffing remain possible. Use a managed edge gateway plus durable/account-aware throttling before exposure.
 - **SEC-R2 (open):** password/session authentication has a 12-hour absolute lifetime but no evidence-backed idle-timeout policy; coordinate with the institution/IdP and test revocation.
 - **SEC-R3 (open):** browser Web Push already accepted by upstream provider **cannot be recalled**; keep payloads generic.
 - **SEC-R4 (open):** SQLite single-instance Render blueprint is not high availability, and backup on the same disk is not disaster recovery.
@@ -55,3 +55,7 @@ References: [OWASP ASVS 5.0](https://owasp.org/projects/asvs), [OWASP API Top 10
 
 Codespaces freshly created from Node 24 devcontainer: `npm run dev` → private forwarded port 3000.
 Render single-instance pilot: `npm start` after automatic production preflight; verify real Render SHA-bound canary separately.
+
+### Extra bounded-memory finding
+
+**SEC-08 medium:** the login throttle Map previously grew without a strict maximum under unique IP/email mutations. R14 now enforces a maximum of 20,000 keyed entries, with a 100,000-input regression test in `test/security-boundaries.test.mjs`. This protects memory only; gateway-level cross-instance and account-rate protection remains open.

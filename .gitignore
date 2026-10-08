@@ -9,3 +9,6 @@ data/
 # R9 isolated Playwright artifacts
 browser/test-results/
 browser/playwright-report/
+
+# BIME security CI evidence
+.bime-evidence/

@@ -36,17 +36,18 @@ jobs:
           GIT_SHA: ${{ github.sha }}
         run: |
           set -o pipefail
-          npm run security:mutations 2>&1 | tee /tmp/lumen-bime-million.log
+          mkdir -p .bime-evidence
+          npm run security:mutations 2>&1 | tee .bime-evidence/mutations.log
       - name: Production dependency vulnerability gate (high/critical)
         run: |
-          npm audit --omit=dev --audit-level=high --json > /tmp/lumen-bime-audit.json
+          mkdir -p .bime-evidence
+          npm audit --omit=dev --audit-level=high --json > .bime-evidence/npm-audit.json
       - name: Preserve security evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lumen-bime-${{ github.sha }}
           path: |
-            /tmp/lumen-bime-million.log
-            /tmp/lumen-bime-audit.json
+            .bime-evidence/
           retention-days: 14
           if-no-files-found: warn
