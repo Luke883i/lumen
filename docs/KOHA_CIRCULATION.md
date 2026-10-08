@@ -37,3 +37,7 @@ API contracts: https://api.koha-community.org/25.11.html . No full enterprise ce
 ## Staff reconciliation (implemented)
 
 The librarian's `/staff/koha-pending` screen accepts an actual Koha hold ID. `POST /api/staff/koha/reconcile` fetches `GET /api/v1/holds/{hold_id}`, validates the active hold's patron and title against the stored pending attempt, and atomically records an audited receipt. Only positive reconciliation is supported; ambiguous operations with no verified hold remain blocked. This is deliberately fail-closed.
+
+## Run live, safe verification (not performed automatically)
+
+Configure **secrets** `KOHA_BASE_URL`, `KOHA_CLIENT_ID`, `KOHA_CLIENT_SECRET` along with a known Koha test fixture: `KOHA_TEST_PATRON_ID`, `KOHA_TEST_PATRON_EMAIL` and optionally `KOHA_TEST_BIBLIO_ID`, then run `GIT_SHA=$(git rev-parse HEAD) npm run koha:smoke`. The command uses only GET endpoints and OAuth2 token grant, never places or cancels a hold. It exits nonzero on a failed check **or when the patron fixture is missing**, binding an evidence report to the SHA. Passing this cannot prove live write compatibility, cross-system identity lifecycle or enterprise readiness.
