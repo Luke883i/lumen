@@ -3,8 +3,16 @@ import {test,expect} from '@playwright/test';
 const sizes=[{width:1440,height:900,heroMax:240},{width:393,height:851,heroMax:180},{width:320,height:700,heroMax:180}];
 const eps=1.5;
 async function checkOverflow(page,label){
- const d=await page.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth}));
- expect(d.scroll,label+' horizontal overflow').toBeLessThanOrEqual(d.viewport+eps);
+ const d=await page.evaluate(()=>{
+  const viewport=innerWidth,scroll=document.documentElement.scrollWidth;
+  const offenders=[...document.querySelectorAll('body *')].map(el=>{
+    const r=el.getBoundingClientRect();
+    return {tag:el.tagName,cls:String(el.className||'').slice(0,80),
+      name:(el.textContent||'').trim().slice(0,45),right:Math.round(r.right),width:Math.round(r.width)};
+  }).filter(x=>x.right>viewport+1.5).slice(0,8);
+  return {viewport,scroll,offenders};
+ });
+ expect(d.scroll,label+' horizontal overflow: '+JSON.stringify(d.offenders)).toBeLessThanOrEqual(d.viewport+eps);
 }
 async function measure(page,selector){
  return page.locator(selector).evaluateAll(nodes=>nodes.map(el=>{

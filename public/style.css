@@ -97,3 +97,12 @@
 @media(min-width:601px){.hero{max-width:100%}}
 /* WCAG-compatible reflow: avoid fixed heights, clipped text or transformed tap areas. */
 @media(prefers-reduced-motion:reduce){.hero,.task-link,.card{transition:none}}
+
+/* UX-S4 falsification: reflow headings and adjacent CTAs at 200% text zoom. */
+.section-head{flex-wrap:wrap;min-width:0}
+.section-head > h2{flex:1 1 150px;min-width:0;overflow-wrap:anywhere;margin-bottom:0}
+.section-head > .btn,.section-head > a{flex-shrink:0}
+@media(max-width:600px){
+  .section-head > h2{flex:1 1 100%}
+  .section-head > .btn,.section-head > a{max-width:100%;white-space:normal}
+}
