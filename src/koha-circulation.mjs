@@ -45,6 +45,10 @@ export function createKohaCirculation(s,koha,config=process.env){
         error(409,'KOHA_IDENTITY_MISMATCH','Email dell’utente e identità Koha non corrispondono.');
       }
       return s.tx(()=>{
+        activeUser(s,staff,['librarian']);
+        const current=s.get('SELECT active,email FROM users WHERE id=?',userId);
+        if(!current?.active||current.email.toLowerCase()!==patron.email.trim().toLowerCase())
+          error(409,'KOHA_BINDING_STALE','Lo stato dell’account è cambiato durante la verifica.');
         const other=s.get('SELECT user_id FROM koha_patron_mappings WHERE koha_patron_id=?',patronId);
         if(other&&other.user_id!==userId)error(409,'KOHA_PATRON_ALREADY_BOUND','Patron Koha già associato');
         const stamp=now();
@@ -56,6 +60,7 @@ export function createKohaCirculation(s,koha,config=process.env){
       const patronId=mapping(user);
       const holds=await koha.patronHolds(patronId);
       if(!Array.isArray(holds))error(503,'KOHA_BAD_RESPONSE','Risposta Koha non conforme');
+      activeUser(s,user,['student','faculty','librarian']);
       return {source:'koha',patronId,holds:holds.filter(h=>h.patron_id===patronId)};
     },
     async placeHold(user,biblio,requestKey){
@@ -86,6 +91,7 @@ export function createKohaCirculation(s,koha,config=process.env){
         if(existing.some(h=>h.biblio_id===biblioId && !h.cancellation_date)){
           error(409,'KOHA_HOLD_EXISTS','Koha ha già una prenotazione per questo titolo.');
         }
+        activeUser(s,user,['student','faculty','librarian']);
         posted=true;
         const remote=await koha.placeHold({patronId,biblioId,pickupLibraryId:config.KOHA_PICKUP_LIBRARY_ID});
         if(!Number.isSafeInteger(remote.hold_id)||remote.hold_id<=0 || remote.patron_id!==patronId || remote.biblio_id!==biblioId){
@@ -124,6 +130,7 @@ export function createKohaCirculation(s,koha,config=process.env){
       const receipt={source:'koha',status:'confirmed',holdId:hold.hold_id,
         patronId:hold.patron_id,biblioId:hold.biblio_id,priority:hold.priority??null,reconciled:true};
       s.tx(()=>{
+        activeUser(s,staff,['librarian']);
         const result=s.run("UPDATE koha_hold_attempts SET state='succeeded',receipt_json=?,updated_at=? WHERE id=? AND state IN ('reserved','uncertain')",
           JSON.stringify(receipt),now(),attempt.id);
         if(!result.changes)error(409,'KOHA_INVALID_STATE','Operazione già risolta');

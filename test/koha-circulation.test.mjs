@@ -143,3 +143,26 @@ test('wrong Koha patron cannot be used as reconciliation evidence',async()=>{
  assert.equal(f.c.pending(f.staff).length,1);
  f.s.close();
 });
+
+test('revocation during remote identity verification cannot bind the disabled user',async()=>{
+ const f=fixture();
+ f.koha.patron=async(id)=>{
+   f.s.run('UPDATE users SET active=0 WHERE id=?',f.student.id);
+   return {patron_id:id,email:f.student.email};
+ };
+ await fail(()=>f.c.bind(f.staff,f.student.id,101),'KOHA_BINDING_STALE');
+ assert.equal(f.s.get('SELECT count(*) n FROM koha_patron_mappings').n,0);
+ f.s.close();
+});
+test('revocation during hold preflight prevents Koha POST',async()=>{
+ const f=fixture();
+ await f.c.bind(f.staff,f.student.id,101);
+ f.koha.patronHolds=async()=>{
+   f.s.run('UPDATE users SET active=0 WHERE id=?',f.student.id);
+   return [];
+ };
+ await fail(()=>f.c.placeHold(f.student,125,'revoked-before-post-001'),'FORBIDDEN');
+ assert.equal(f.calls.posts,0);
+ assert.equal(f.s.get('SELECT state FROM koha_hold_attempts').state,'rejected');
+ f.s.close();
+});
