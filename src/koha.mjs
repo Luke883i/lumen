@@ -69,6 +69,32 @@ export function makeKoha(config=process.env,transport=fetch){
       if(!/^[1-9]\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo prestito non valido',400);
       return normalizeCheckout(await get('/api/v1/checkouts/'+id));
     },
+
+    async checkedInCheckout({patronId,checkoutId,itemId}){
+      const num=v=>/^[1-9]\d{0,11}$/.test(String(v||''))?Number(v):null;
+      const p=num(patronId),c=num(checkoutId),i=num(itemId);
+      if(!p||!c||!i)throw new KohaError('KOHA_ID_INVALID','Identificativi rientro non validi',400);
+      // Koha official checkout list supports checked_in=true. Never infer a return from a 404
+      // on the live-checkout endpoint, since that can also mean permission or network failures.
+      // Bounded pagination: incomplete history is a blocker, never a negative proof.
+      for(let page=1;page<=10;page++){
+        const qs=new URLSearchParams({patron_id:String(p),checked_in:'true',_per_page:'100',_page:String(page)});
+        const rows=await get('/api/v1/checkouts?'+qs.toString());
+        if(!Array.isArray(rows)||rows.length>100)throw new KohaError('KOHA_RETURN_SCHEMA','Storico rientri Koha non verificabile');
+        for(const row of rows){
+          if(Number(row.checkout_id)===c){
+            if(Number(row.patron_id)!==p||Number(row.item_id)!==i)
+              throw new KohaError('KOHA_RETURN_MISMATCH','Identità e copia del rientro non coincidono',409);
+            if(typeof row.checkin_date!=='string'||!Number.isFinite(Date.parse(row.checkin_date)))
+              throw new KohaError('KOHA_RETURN_UNCONFIRMED','Koha non conferma la data di restituzione',409);
+            return {checkout_id:c,patron_id:p,item_id:i,checkin_date:row.checkin_date,
+              checkin_library_id:str(row.checkin_library_id,30),source:'koha'};
+          }
+        }
+        if(rows.length<100)return null;
+      }
+      throw new KohaError('KOHA_RETURN_PAGINATION','Storico Koha oltre 1000 record: impossibile certificare il rientro');
+    },
     async renewalAvailability(id){
       if(!/^[1-9]\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo prestito non valido',400);
       const response=await get('/api/v1/checkouts/'+id+'/allows_renewal');
