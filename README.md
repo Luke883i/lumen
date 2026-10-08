@@ -21,6 +21,14 @@ Connect the repo to a Render Blueprint (`render.yaml`). Render provisions a Node
 
 `bash scripts/bootstrap.sh` verifies the environment and installs dependencies, `npm run start` runs the server, `npm test` runs deterministic domain/API tests, `npm run check` checks JS syntax. A health endpoint is available at `/api/health`.
 
+## Koha read-only catalogue bridge
+
+Set `KOHA_BASE_URL`, `KOHA_CLIENT_ID`, `KOHA_CLIENT_SECRET` on the server to connect a Koha 25.11 bibliographic catalog with OAuth2; open `/koha` from the navigation. This integration is explicitly **read-only**: Koha holds, renewals and checkouts are not implemented. See [Koha integration gates](docs/KOHA.md).
+
+## Load audit
+
+The separate [k6 workflow](.github/workflows/load-audit.yml) tests 2,000 synthetic authenticated sessions on a GitHub runner. This is **not** a Render/enterprise/production certification. See [load report protocol](docs/LOAD_AUDIT.md).
+
 ## Non-negotiable architectural boundaries
 
 - **Standalone mode**: self-contained lightweight single-library circulation, not a full ILS. It does **not** claim MARC cataloguing, federated OPAC, inter-library lending, fines, serials or Koha parity.

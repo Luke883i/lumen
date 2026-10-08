@@ -31,7 +31,7 @@ function fixture(){
 test('no unconfigured Koha bridge silently falls back to SQLite',async()=>{
   const b=makeKoha({NODE_ENV:'test'});
   assert.equal(b.configured,false);
-  await assert.rejects(b.search('title'),e=>e.code==='KOHA_NOT_CONFIGURED');
+  assert.throws(()=>b.search('title'),e=>e.code==='KOHA_NOT_CONFIGURED');
 });
 test('Koha enforces TLS and origin-scope of configured authority',()=>{
   assert.throws(()=>makeKoha({KOHA_BASE_URL:'http://remote.example',KOHA_CLIENT_ID:'A',KOHA_CLIENT_SECRET:'B'}),e=>e.code==='KOHA_CONFIGURATION');

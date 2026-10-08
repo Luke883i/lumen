@@ -1,29 +1,39 @@
 name: CI
-permissions:
-  contents: read
-  pull-requests: write
 on:
   push:
   pull_request:
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node: [24]
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
-      - run: npm install
+          node-version: '24'
+          cache: npm
+      - run: npm ci
       - run: npm run check
-      - name: Run domain and HTTP tests
-        run: |
-          set -o pipefail
-          npm test 2>&1 | tee /tmp/lumen-test-report.log
-      - name: Attach failing test report to PR
-        if: failure()
+      - name: Domain, HTTP and Koha contract tests
+        run: npm test
+      - name: Start command and health probe
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh pr comment 1 --body-file /tmp/lumen-test-report.log
+          NODE_ENV: test
+          LUMEN_DEMO: '1'
+          LUMEN_DB_PATH: ./data/ci-smoke.sqlite
+          PORT: '3000'
+        run: |
+          node src/server.mjs > /tmp/lumen-start.log 2>&1 &
+          PID=$!
+          trap 'kill "$PID" || true' EXIT
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:3000/api/health | grep -q '"status":"ok"'; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3000/ | grep -q 'LUMEN'
+          curl -fsS http://127.0.0.1:3000/api/config | grep -q '"configured":false'
+      - name: Surface smoke diagnostic
+        if: failure()
+        run: cat /tmp/lumen-start.log 2>/dev/null || true
