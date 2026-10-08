@@ -27,3 +27,7 @@ Mock IdP domain/HTTP suite: state expiry/replay, CSRF, role non-escalation, dupl
 ## Live metadata verification (read-only)
 
 With institutional OIDC environment credentials configured and the exact registered callback, run `GIT_SHA=$(git rev-parse HEAD) npm run oidc:smoke`. The script validates HTTPS issuer/authorization/token/JWKS endpoints, support for response_type code and explicit S256 PKCE metadata. No interactive login or token exchange is performed. PASS is metadata evidence only; production login, JWT signature, claim mapping, session revocation, provider outages and IdP lifecycle still require a controlled staging acceptance test.
+
+## Bounded authentication state
+
+R6 stores only short-lived PKCE verifier, nonce and hashes of browser state/flow. `oidc_flows.expires_at` has an index. A maximum of 20,000 simultaneous pending flows (configurable with `OIDC_FLOW_LIMIT` 1..50000 for tests and capacity planning) fails closed with HTTP 429 rather than consuming unbounded SQLite storage. This does **not** replace edge DDoS protection, IdP login throttling or a 2,000-user production-equivalent load test.

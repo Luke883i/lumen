@@ -102,3 +102,26 @@ test('state mismatch and expired cookie cannot reach IdP callback',async()=>{
  await fails(()=>f.oidc.finish(a.flow,sa,'code=x&state='+sa),'OIDC_STATE_INVALID');
  f.s.close();
 });
+
+test('OIDC authorization flow limit bounds persistent state while allowing expiry recovery',async()=>{
+ const f=setup({OIDC_FLOW_LIMIT:'2'});
+ await f.oidc.start();await f.oidc.start();
+ await fails(()=>f.oidc.start(),'OIDC_FLOW_CAPACITY');
+ assert.equal(f.s.get('SELECT count(*) n FROM oidc_flows').n,2);
+ f.s.run('UPDATE oidc_flows SET expires_at=? WHERE rowid IN (SELECT rowid FROM oidc_flows LIMIT 1)',
+   new Date(Date.now()-60000).toISOString());
+ await f.oidc.start();
+ assert.equal(f.s.get('SELECT count(*) n FROM oidc_flows').n,2);
+ assert.equal(f.s.get("SELECT count(*) n FROM sqlite_master WHERE type='index' AND name='idx_oidc_flows_expiry'").n,1);
+ f.s.close();
+});
+test('OIDC v6 refuses a token helper incompatible with the actual library',async()=>{
+ const f=setup();
+ f.oidc.bind(f.librarian,f.student.id,'subject-123');
+ f.library.authorizationCodeGrant=async()=>({getValidatedIdTokenClaims:()=>({iss:environment.OIDC_ISSUER,sub:'subject-123',email:f.student.email,email_verified:true})});
+ const start=await f.oidc.start();
+ const state=new URL(start.redirect).searchParams.get('state');
+ await fails(()=>f.oidc.finish(start.flow,state,'code=x&state='+state),'OIDC_CLAIMS_INVALID');
+ assert.equal(f.s.get("SELECT count(*) n FROM sessions").n,0);
+ f.s.close();
+});

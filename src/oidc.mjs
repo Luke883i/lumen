@@ -26,6 +26,8 @@ export function oidcConfiguration(env=process.env){
 }
 export function createOidc(s,env=process.env,provider=null){
   const settings=oidcConfiguration(env);
+  const maxPending=Number.isInteger(Number(env.OIDC_FLOW_LIMIT))&&Number(env.OIDC_FLOW_LIMIT)>=1&&Number(env.OIDC_FLOW_LIMIT)<=50000
+    ?Number(env.OIDC_FLOW_LIMIT):20000;
   let cached=null,loading=null;
   async function implementation(){
     if(provider)return provider;
@@ -65,6 +67,8 @@ export function createOidc(s,env=process.env,provider=null){
       if(authorization.protocol!=='https:')denied(503,'OIDC_AUTHORIZATION_URL_INVALID','Provider identity non attendibile');
       s.tx(()=>{
         s.run('DELETE FROM oidc_flows WHERE expires_at<?',now());
+        if(s.get('SELECT count(*) n FROM oidc_flows').n>=maxPending)
+          denied(429,'OIDC_FLOW_CAPACITY','Troppe autenticazioni in corso, riprova');
         s.run('INSERT INTO oidc_flows(flow_hash,state_hash,verifier,nonce,expires_at) VALUES(?,?,?,?,?)',
           digest(flow),digest(state),verifier,nonce,new Date(Date.now()+300000).toISOString());
       });
