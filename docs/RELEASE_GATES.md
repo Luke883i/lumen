@@ -103,3 +103,7 @@ Cross-account endpoint reassignment is forbidden. Logout, role disable, account 
 ## UX-S2 — Proiezioni di lettura, nessuna nuova autorità
 
 Implementazione in `public/projections.js`, consumata dalla UI LUMEN e inclusa nella shell offline. Test di mutazione su titolo locale, Koha bibliografico, prestiti, prenotazioni, proposte, comunicazioni, ruolo e verifiche Koha; `node --check`, CI di dominio/HTTP, browser desktop e Android emulato, Codespaces e Render contract. Le azioni esposte sono affordance condizionali, non autorizzazioni; il backend resta l'unica autorità delle transizioni. Evidenze reali Koha, Render, Android, 2.000 utenti concorrenti e signoff istituzionale ancora **BLOCKED**.
+
+## UX-S3: task IA (PR #13)
+
+Side-effect-free role/route selectors, ≤5 mobile primary links, separate Koha deep links, seven librarian workspaces with selected-area data fetching; RBAC and domain transitions unchanged. Unit tests and desktop/Android-emulated Chromium are local evidence, not real device or enterprise certification. See [UX_S3_IA.md](UX_S3_IA.md).

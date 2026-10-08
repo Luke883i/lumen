@@ -191,3 +191,101 @@ test('UX-S2 faculty proposal is labelled in evaluation, never presented as purch
   await expect(entry).toContainText('non è un ordine');
   await expect(entry).not.toContainText('acquistato');
 });
+
+
+test('UX-S3 librarian task workspaces disclose only the selected operation',async({page})=>{
+ await signIn(page,'librarian');
+ const nav=page.getByRole('navigation',{name:'Attività del banco'});
+ await expect(nav.getByRole('link')).toHaveCount(7);
+ await expect(nav.getByRole('link',{name:'Panoramica'})).toHaveAttribute('aria-current','page');
+ await expect(page.getByRole('main')).toContainText('Prestiti attivi');
+ await expect(page.locator('form[data-form="checkout"]')).toHaveCount(0);
+ await nav.getByRole('link',{name:'Circolazione'}).click();
+ await expect(page).toHaveURL(/\/staff\?area=circolazione$/);
+ await expect(page.locator('form[data-form="checkout"]')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Prestiti da gestire'})).toBeVisible();
+ await expect(page.locator('form[data-form="book"]')).toHaveCount(0);
+ await expect(page.locator('form[data-form="broadcast"]')).toHaveCount(0);
+ await nav.getByRole('link',{name:'Catalogo'}).click();
+ await expect(page.locator('form[data-form="book"]')).toBeVisible();
+ await expect(page.locator('form[data-form="checkout"]')).toHaveCount(0);
+ await page.goto('/staff?area=acquisti');
+ await expect(page.getByRole('heading',{name:'Proposte d’acquisto'})).toBeVisible();
+ await expect(page.locator('form[data-form="user"]')).toHaveCount(0);
+ await page.goto('/staff?area=persone');
+ await expect(page.locator('form[data-form="user"]')).toBeVisible();
+ await expect(page.locator('form[data-form="broadcast"]')).toHaveCount(0);
+ await page.goto('/staff?area=comunicazioni');
+ await expect(page.locator('form[data-form="broadcast"]')).toBeVisible();
+ await expect(page.locator('form[data-form="user"]')).toHaveCount(0);
+ await page.goto('/staff?area=integrazioni');
+ await expect(page.getByRole('main')).toContainText('Nessuna integrazione istituzionale attivata');
+ await page.goto('/staff?area=invalid');
+ await expect(nav.getByRole('link',{name:'Panoramica'})).toHaveAttribute('aria-current','page');
+});
+
+test('UX-S3 role navigation remains <=5 and privileged pages are inaccessible to patrons',async({page,isMobile})=>{
+ for(const role of ['student','faculty','librarian']){
+   await signIn(page,role);
+   // Inspect primary-route contracts in BOTH projects. getByRole omits
+   // CSS-hidden mobile navigation on desktop by design.
+   const mobile=page.locator('nav.bottom-nav');
+   const routes=await mobile.locator('a').evaluateAll(links=>links.map(x=>x.getAttribute('href')));
+   expect(routes.length).toBeLessThanOrEqual(5);
+   expect(new Set(routes).size).toBe(routes.length);
+   expect(routes).toContain('/catalogo');
+   expect(routes).toContain('/me');
+   expect(routes).toContain('/notifiche');
+   expect(routes.includes('/acquisti')).toBe(role==='faculty');
+   expect(routes.includes('/staff')).toBe(role==='librarian');
+   if(isMobile){
+     const widths=await page.evaluate(()=>({inner:innerWidth,outer:document.documentElement.scrollWidth}));
+     expect(widths.outer).toBeLessThanOrEqual(widths.inner+1);
+   }
+   if(role!=='librarian'){
+     await page.goto('/staff?area=persone');
+     await expect(page.locator('form[data-form="user"]')).toHaveCount(0);
+   }
+   if(role!=='faculty'){
+     await page.goto('/acquisti');
+     await expect(page.locator('form[data-form="suggest"]')).toHaveCount(0);
+   }
+   // Logout between role cases. No separate server authority is created by navigation.
+   await page.goto('/impostazioni');
+   await page.locator('[data-click="logout"]').click();
+   await expect(page).toHaveURL(/\/$/);
+ }
+});
+
+test('UX-S3 anonymous task-first entry and secondary services stay reachable',async({page,isMobile})=>{
+ await page.goto('/');
+ await expect(page.getByRole('heading',{name:'Cosa puoi fare'})).toBeVisible();
+ await expect(page.locator('.task-hub').getByRole('link',{name:/Cerca nel catalogo/})).toBeVisible();
+ await expect(page.locator('.task-hub').getByRole('link',{name:/Accedi alla biblioteca/})).toBeVisible();
+ if(!isMobile){
+   const more=page.locator('.nav-more');
+   await more.locator('summary').click();
+   await expect(more.getByRole('link',{name:'Installa LUMEN'})).toBeVisible();
+ }
+ await page.locator(isMobile?'nav.bottom-nav a[href="/catalogo"]':'nav.nav a[href="/catalogo"]').click();
+ await expect(page.getByRole('heading',{name:'Catalogo'})).toBeVisible();
+});
+
+
+test('UX-S3 selected staff workspaces do not fetch unrelated bibliographic and identity datasets',async({page})=>{
+ await signIn(page,'librarian');
+ const requested=[];
+ page.on('request',req=>{
+   const route=new URL(req.url()).pathname;
+   if(['/api/staff/stats','/api/staff/users','/api/books','/api/suggestions'].includes(route))
+     requested.push(route);
+ });
+ await page.goto('/staff?area=comunicazioni');
+ await expect(page.locator('form[data-form="broadcast"]')).toBeVisible();
+ expect(requested).toEqual([]);
+ await page.goto('/staff?area=acquisti');
+ await expect(page.getByRole('heading',{name:'Proposte d’acquisto'})).toBeVisible();
+ expect(requested).toContain('/api/suggestions');
+ expect(requested).not.toContain('/api/staff/users');
+ expect(requested).not.toContain('/api/staff/stats');
+});

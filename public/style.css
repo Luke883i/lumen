@@ -31,3 +31,33 @@
 .empty{max-width:100%}
 @media(max-width:600px){.install-panel{grid-template-columns:1fr;padding:18px}.lumen-dialog .dialog-content{padding:20px}.lumen-dialog .dialog-actions .btn{flex:1}}
 @media(prefers-reduced-motion:reduce){.lumen-dialog::backdrop{backdrop-filter:none}}
+
+/* UX-S3: secondary operations are progressive; do not create a second desktop toolbar. */
+.nav-more{position:relative;align-self:center}
+.nav-more summary{cursor:pointer;list-style:none;padding:10px 12px;color:#536276;font-weight:650;border-radius:12px;font-size:.9rem}
+.nav-more summary::-webkit-details-marker{display:none}
+.nav-more summary::after{content:" ▾"}
+.nav-more[open] summary,.nav-more summary:hover{background:#e5eee9;color:#176f65}
+.nav-more-menu{position:absolute;z-index:30;right:0;top:100%;width:230px;padding:7px;background:white;border:1px solid var(--lumen-line);box-shadow:var(--lumen-shadow);border-radius:var(--lumen-radius-sm);display:grid;gap:3px}
+.nav-more-menu a{display:block}
+.task-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:12px}
+.task-link{display:flex;justify-content:space-between;gap:16px;align-items:center;border:1px solid var(--lumen-line);background:white;border-radius:var(--lumen-radius-sm);padding:14px 16px;min-height:66px}
+.task-link strong{display:block;color:var(--lumen-ink)}
+.task-link small{display:block;line-height:1.35;margin-top:3px}
+.task-link:hover{border-color:var(--lumen-teal);background:#f4faf8}
+.staff-workspaces{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:14px 0 8px}
+.staff-workspaces a{border-radius:12px;border:1px solid var(--lumen-line);padding:10px 13px;min-height:44px;display:inline-flex;align-items:center;font-weight:650;font-size:.9rem;background:#fff}
+.staff-workspaces a[aria-current=page]{background:var(--lumen-ink);color:white;border-color:var(--lumen-ink)}
+.staff-hint{margin:8px 0 18px}
+.staff-panel{max-width:760px}
+@media(max-width:600px){
+  .staff-workspaces{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;padding-bottom:8px}
+  .staff-workspaces a{white-space:nowrap;flex:none}
+  .task-list{grid-template-columns:1fr}
+  .bottom-nav a{min-width:0;flex:1 1 0;display:flex;align-items:center;flex-direction:column;gap:2px;padding-inline:2px}
+  .bottom-nav a span{font-size:.64rem;line-height:1.15;white-space:normal;text-align:center}
+  .bottom-nav svg{width:20px;height:20px;flex-shrink:0}
+}
+
+/* Native disclosure summary requires an explicit keyboard focus indicator. */
+.nav-more summary:focus-visible,.staff-workspaces a:focus-visible,.task-link:focus-visible{outline:3px solid var(--lumen-gold);outline-offset:3px}
