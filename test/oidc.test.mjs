@@ -159,3 +159,30 @@ test('database session auth origin distinguishes password and OIDC identities',a
  assert.equal(service.current(oidc.token).auth_method,'oidc');
  f.s.close();
 });
+
+test('existing R5 SQLite session schema is upgraded without destroying existing sessions',async()=>{
+ const {mkdtempSync,rmSync}=await import('node:fs');
+ const {join}=await import('node:path');
+ const {tmpdir}=await import('node:os');
+ const {DatabaseSync}=await import('node:sqlite');
+ const dir=mkdtempSync(join(tmpdir(),'lumen-sso-migrate-'));
+ const dbPath=join(dir,'lumen.sqlite');
+ try{
+   const legacy=new DatabaseSync(dbPath);
+   legacy.exec("CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), csrf TEXT NOT NULL, expires_at TEXT NOT NULL)");
+   legacy.close();
+   const upgraded=openStore(dbPath);
+   const cols=upgraded.all('PRAGMA table_info(sessions)').map(x=>x.name);
+   assert.equal(cols.filter(x=>x==='auth_method').length,1);
+   bootstrap(upgraded,{NODE_ENV:'test',LUMEN_DEMO:'1'});
+   const u=upgraded.get("SELECT email FROM users WHERE role='student'");
+   const auth=createService(upgraded).login(u.email,'Demo1234!');
+   assert.equal(upgraded.get('SELECT auth_method FROM sessions WHERE token_hash=?',
+     (await import('../src/store.mjs')).tokenHash(auth.token)).auth_method,'local');
+   upgraded.close();
+   // Reopening an already-upgraded database must be idempotent.
+   const repeat=openStore(dbPath);
+   assert.equal(repeat.all('PRAGMA table_info(sessions)').filter(x=>x.name==='auth_method').length,1);
+   repeat.close();
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
