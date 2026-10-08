@@ -100,3 +100,22 @@ test('preflight rejects issue/renew on account revocation before external POST',
  await fails(()=>f.loans.issue(f.staff,f.student.id,81,'disable-before-issue-01'),'KOHA_PATRON_DISABLED');
  assert.equal(f.calls.issue,0);f.s.close();
 });
+
+test('renewal reconciliation requires proven increment and matches Koha source ID',async()=>{
+ const f=fixture({async renewCheckout(){throw Object.assign(new Error('unknown commit'),{code:'KOHA_NETWORK'});}});
+ await fails(()=>f.loans.renew(f.student,501,'recover-renew-commit-0001'),'KOHA_RECONCILIATION_REQUIRED');
+ const attempt=f.loans.pending(f.staff)[0];assert.equal(attempt.checkout_id,501);
+ await fails(()=>f.loans.reconcile(f.staff,attempt.id,502),'KOHA_RECEIPT_MISMATCH');
+ await fails(()=>f.loans.reconcile(f.staff,attempt.id,501),'KOHA_RECEIPT_MISMATCH');
+ f.bridge.checkout=async id=>({checkout_id:id,patron_id:101,item_id:81,renewals_count:1,checkin_date:null,due_date:'2026-12-16'});
+ const confirmed=await f.loans.reconcile(f.staff,attempt.id,501);
+ assert.equal(confirmed.reconciled,true);
+ assert.equal(confirmed.renewals,1);
+ assert.deepEqual(await f.loans.renew(f.student,501,'recover-renew-commit-0001'),confirmed);
+ assert.equal(f.loans.pending(f.staff).length,0);
+ f.s.close();
+});
+test('new patron cannot issue through missing Koha binding even when staff authorised',async()=>{
+ const f=fixture();await fails(()=>f.loans.issue(f.staff,f.faculty.id,81,'missing-patron-mapping-01'),'KOHA_MAPPING_MISSING');
+ assert.equal(f.calls.issue,0);f.s.close();
+});
