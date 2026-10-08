@@ -33,7 +33,7 @@ const ddl = [
   "CREATE TABLE IF NOT EXISTS suggestions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), title TEXT NOT NULL, author TEXT NOT NULL, isbn TEXT NOT NULL DEFAULT '', reason TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected','ordered')), created_at TEXT NOT NULL, reviewed_at TEXT)",
   "CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), title TEXT NOT NULL, body TEXT NOT NULL, kind TEXT NOT NULL, created_at TEXT NOT NULL, read_at TEXT, push_status TEXT NOT NULL DEFAULT 'pending', push_attempts INTEGER NOT NULL DEFAULT 0)",
   "CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id,created_at DESC)",
-  "CREATE TABLE IF NOT EXISTS subscriptions (endpoint TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), payload TEXT NOT NULL, created_at TEXT NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS subscriptions (endpoint TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), payload TEXT NOT NULL, created_at TEXT NOT NULL, session_hash TEXT NOT NULL DEFAULT '')",
   "CREATE INDEX IF NOT EXISTS idx_holds_queue ON holds(book_id,status,created_at,id)",
   "CREATE INDEX IF NOT EXISTS idx_loans_user ON loans(user_id,status)",
   "CREATE INDEX IF NOT EXISTS idx_copies_book ON copies(book_id)",
@@ -84,6 +84,20 @@ export function openStore(path = './data/lumen.sqlite') {
   // Migrate with a backward-compatible, explicit local default.
   if(!db.prepare('PRAGMA table_info(sessions)').all().some(x=>x.name==='auth_method'))
     db.exec("ALTER TABLE sessions ADD COLUMN auth_method TEXT NOT NULL DEFAULT 'local' CHECK(auth_method IN ('local','oidc'))");
+  // R9b: existing push rows cannot be proven to belong to the session that
+  // registered them. Purge only those legacy device bindings (inbox remains).
+  // Atomic and restart-idempotent: a crash after the schema change must not
+  // leave legacy unowned device bindings eligible for future delivery.
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    if(!db.prepare('PRAGMA table_info(subscriptions)').all().some(x=>x.name==='session_hash'))
+      db.exec("ALTER TABLE subscriptions ADD COLUMN session_hash TEXT NOT NULL DEFAULT ''");
+    db.exec("DELETE FROM subscriptions WHERE session_hash=''");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_subscriptions_session_hash ON subscriptions(session_hash)");
+    db.exec('COMMIT');
+  } catch(error) {
+    db.exec('ROLLBACK');throw error;
+  }
   if (!db.prepare("SELECT 1 FROM metadata WHERE key='catalog_fts_v1'").get()) {
     db.exec('BEGIN IMMEDIATE');
     try {

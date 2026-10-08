@@ -191,16 +191,24 @@ async function settings(){
   if(!state.user)return login();
   const cfg=await api('/api/push-config');
   const supported='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
-  let subscribed=false;
+  let subscribed=false,needsReset=false;
   if(cfg.enabled&&supported&&Notification.permission==='granted'){
-    try{const reg=await navigator.serviceWorker.getRegistration('/');subscribed=!!(await reg?.pushManager?.getSubscription());}catch{}
+    try{
+      const reg=await navigator.serviceWorker.getRegistration('/');
+      const subscription=await reg?.pushManager?.getSubscription();
+      if(subscription){
+        const status=await api('/api/push-subscription?endpoint='+encodeURIComponent(subscription.endpoint));
+        subscribed=status.owned===true;
+        needsReset=!subscribed;
+      }
+    }catch{} // Missing ownership proof must never be displayed as enabled.
   }
   const push=pushExperience({serverEnabled:cfg.enabled,secure:window.isSecureContext,
-    supported,permission:supported?Notification.permission:'default',subscribed});
+    supported,permission:supported?Notification.permission:'default',subscribed,needsReset});
   return sectionTitle('Impostazioni','Il tuo account e le preferenze di comunicazione.')
     +'<div class="layout section"><div class="card"><h2>Profilo</h2><p><strong>'+t(state.user.name)+'</strong><br>'+t(state.user.email)+'<br>'+badge({student:'Studente',faculty:'Docente',librarian:'Bibliotecario'}[state.user.role])+'</p>'+btn('Esci','logout','','ghost')+'<hr class="divider"><form class="form" data-form="change-password"><h3>Cambia password</h3>'+field('Password attuale','oldPassword','',true,'password')+field('Nuova password (12+ caratteri)','newPassword','',true,'password')+'<button class="btn small" type="submit">Aggiorna password</button></form></div>'
     +'<div class="card"><h2>Notifiche</h2><div class="pref-status" data-status="'+esc(push.status)+'"><strong>'+t(push.title)+'</strong><p>'+t(push.detail)+'</p></div>'
-    +(push.action?btn(push.action==='enable-push'?'Attiva su questo dispositivo':'Disattiva su questo dispositivo',push.action,'','alt'):'')
+    +(push.action?btn(push.action==='enable-push'?'Attiva su questo dispositivo':push.action==='reset-push'?'Ripristina questo dispositivo':'Disattiva su questo dispositivo',push.action,'','alt'):'')
     +'<p class="fine">Gli avvisi restano nella <a data-nav href="/notifiche"><u>casella comunicazioni</u></a>, indipendentemente dai permessi del browser.</p>'
     +'<hr class="divider"><h3>Installa LUMEN</h3><p class="muted">'+t(installModel().detail)+'</p><a class="btn alt small" data-nav href="/installazione">Istruzioni di installazione →</a></div></div>';
 }
@@ -319,8 +327,10 @@ document.addEventListener('click',async event=>{
   b.disabled=true;
   try{
     if(action==='logout'){
-      await disablePush(true);
+      // Server logout first revokes every push binding of this session.
+      // Browser SW cleanup is only best effort and cannot block logout.
       await api('/api/logout','POST');state.user=null;state.csrf=null;
+      try{await clearLocalPush();}catch{}
       navigate('/');message('Sessione terminata');return;
     }
     if(['cancel-hold','return','disable'].includes(action)){
@@ -346,6 +356,7 @@ document.addEventListener('click',async event=>{
     }
     if(action==='enable-push'){await enablePush();message('Notifiche attive su questo dispositivo');await render();return;}
     if(action==='disable-push'){await disablePush();message('Notifiche disattivate su questo dispositivo');await render();return;}
+    if(action==='reset-push'){await clearLocalPush();message('Dispositivo ripristinato. Puoi attivare le notifiche per questo account.');await render();return;}
     message('Operazione completata');await render();
   }catch(e){message(e.message,true);b.disabled=false;}
 });
@@ -431,15 +442,21 @@ async function enablePush(){
   const subscription=current||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
   await api('/api/push-subscription','POST',subscription.toJSON());
 }
-async function disablePush(quiet=false){
+async function clearLocalPush(){
   if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
-  const reg=await navigator.serviceWorker.ready;
-  const subscription=await reg.pushManager.getSubscription();
+  const reg=await navigator.serviceWorker.getRegistration('/');
+  const subscription=await reg?.pushManager?.getSubscription();
+  if(subscription&&!await subscription.unsubscribe())
+    throw new Error('Il browser non ha potuto rimuovere la sottoscrizione. Riprova dalle impostazioni del sito.');
+}
+async function disablePush(){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+  const reg=await navigator.serviceWorker.getRegistration('/');
+  const subscription=await reg?.pushManager?.getSubscription();
   if(!subscription)return;
-  // Revoke user-to-device delivery on the server BEFORE browser unsubscribe.
+  // Revoke authenticated delivery on server before resetting OS channel.
   await api('/api/push-subscription','DELETE',{endpoint:subscription.endpoint});
-  const unsubscribed=await subscription.unsubscribe();
-  if(!unsubscribed && !quiet)throw new Error('Impossibile disattivare la sottoscrizione sul dispositivo.');
+  await clearLocalPush();
 }
 window.addEventListener('popstate',render);
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.install=e;if(location.pathname==='/installazione')render();});

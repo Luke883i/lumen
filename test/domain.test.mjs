@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {openStore,bootstrap,hashPassword,verifyPassword} from '../src/store.mjs';
 import {createService} from '../src/service.mjs';
+import {pushKeys} from './push-fixtures.mjs';
 
 function fixture() {
   const s=openStore(':memory:');
@@ -154,8 +155,10 @@ test('password rotation revokes sessions and rejects stale credentials',()=>{
 test('web push endpoints cannot redirect delivery to arbitrary hosts',()=>{
   const {s,svc,user}=fixture();
   const student=user('student');
-  fails(()=>svc.subscribe(student,{endpoint:'https://127.0.0.1/admin',keys:{p256dh:'AA',auth:'BB'}}),'PUSH_PROVIDER_DENIED');
-  assert.ok(svc.subscribe(student,{endpoint:'https://fcm.googleapis.com/fcm/send/abc',keys:{p256dh:'AA',auth:'BB'}}).ok);
+  const token=svc.login(student.email,'Demo1234!').token;
+  const keys=pushKeys;
+  fails(()=>svc.subscribe(student,{endpoint:'https://127.0.0.1/admin',keys},token),'PUSH_PROVIDER_DENIED');
+  assert.ok(svc.subscribe(student,{endpoint:'https://fcm.googleapis.com/fcm/send/abc',keys},token).ok);
   s.close();
 });
 

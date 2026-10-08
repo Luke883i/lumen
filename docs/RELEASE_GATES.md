@@ -95,3 +95,7 @@ Implemented: deterministic install/permission helper with test-covered platform 
 `browser/` is an isolated test-only npm package with pinned `@playwright/test@1.64.0` and lockfile. GitHub Actions starts the actual `npm run dev` runtime on ephemeral in-memory demo SQLite, exercises desktop Chromium and Android emulation, and archives traces/screenshots on failure. Verified dimensions: public home/search, install-prompt dismissal, student reservation and modal cancellation/confirmation, faculty acquisitions, librarian desk, roles/access boundaries, push-unconfigured fallback, mobile overflow and offline shell.
 
 A green automated browser test is **not** physical Android launcher installation, Windows app-shell integration, real Chrome OS push consent/delivery or WCAG audit. R9 real-device acceptance in `docs/UX_ACCEPTANCE.md` remains BLOCKED until device-bound evidence. R10 Render live and R11 real Koha/IdP are independent workstreams; R12 sustained 2,000 concurrency and R13 release signoff must not be inferred.
+
+## R9b — Web Push isolation
+
+Cross-account endpoint reassignment is forbidden. Logout, role disable, account switch and stale provider delivery are tested with an explicit session-binding contract; existing legacy subscriptions are intentionally purged on migration. Real Android/Windows Chrome delivery and consent acceptance remain BLOCKED. See [PUSH_LIFECYCLE.md](PUSH_LIFECYCLE.md).

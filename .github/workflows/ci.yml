@@ -22,6 +22,13 @@ jobs:
         run: |
           set -o pipefail
           npm test 2>&1 | tee /tmp/lumen-test.log
+      - name: Post R9b test diagnostics on failures
+        if: failure() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo '### R9b CI test assertions · ${{ github.sha }}'; echo '~~~text'; tail -n 180 /tmp/lumen-test.log 2>/dev/null || true; echo '~~~'; } > /tmp/lumen-r9b-errors.md
+          gh pr comment 10 --body-file /tmp/lumen-r9b-errors.md
       - name: Render release contract
         run: npm run verify:deploy
       - name: Clean Codespaces and npm start runtime journeys

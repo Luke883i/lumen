@@ -18,10 +18,11 @@ export function installExperience({standalone=false,canPrompt=false,userAgent=''
   if(/Android/i.test(ua))return {status:'manual_android',title:'Aggiungi LUMEN su Android',detail:'Nel menu di Chrome, scegli “Installa app” oppure “Aggiungi a schermata Home”, quando disponibile.',canInstall:false};
   return {status:'manual_desktop',title:'Installa LUMEN sul computer',detail:'Nel menu di Chrome o Edge cerca “Installa LUMEN” o “Installa questa pagina come app”, quando disponibile.',canInstall:false};
 }
-export function pushExperience({serverEnabled=false,secure=false,supported=false,permission='default',subscribed=false}={}){
+export function pushExperience({serverEnabled=false,secure=false,supported=false,permission='default',subscribed=false,needsReset=false}={}){
   if(!serverEnabled)return {status:'server_unconfigured',title:'Avvisi nell’app',detail:'La tua biblioteca non ha ancora attivato le notifiche di sistema. Gli avvisi restano consultabili nella tua area.',action:null};
   if(!secure||!supported)return {status:'unsupported',title:'Notifiche di sistema non disponibili',detail:'Per gli avvisi di sistema apri LUMEN in un browser compatibile su HTTPS. La tua casella avvisi rimane disponibile.',action:null};
   if(permission==='denied')return {status:'denied',title:'Notifiche bloccate dal browser',detail:'Puoi modificare il permesso nelle impostazioni del sito di Chrome. Continuerai a ricevere gli avvisi nell’app.',action:null};
+  if(needsReset)return {status:'device_account_mismatch',title:'Dispositivo associato a un’altra sessione',detail:'Questa sottoscrizione non appartiene al tuo account attuale. Ripristinala sul dispositivo prima di attivare nuovi avvisi. La casella comunicazioni resta disponibile.',action:'reset-push'};
   if(permission==='granted'&&subscribed)return {status:'subscribed',title:'Notifiche attive su questo dispositivo',detail:'Puoi disattivarle qui senza perdere gli avvisi nella tua casella.',action:'disable-push'};
   return {status:permission==='granted'?'granted':'not_requested',title:'Ricevi gli avvisi anche fuori da LUMEN',detail:'Scegli tu se ricevere notifiche di sistema per gli aggiornamenti della biblioteca. Il consenso è facoltativo.',action:'enable-push'};
 }

@@ -2,6 +2,10 @@
 
 LUMEN is a deployable, installable library-services PWA for patrons, faculty and librarians.
 
+## R9b — Push identity and device revocation
+
+Web Push is now scoped to authenticated account and session. Browser logout and account replacement revoke old server enrollment; no account can silently take over another endpoint. Legacy push enrollments are cleared on migration and require user opt-in again. [Lifecycle and release gates](docs/PUSH_LIFECYCLE.md).
+
 ## LUMEN experience and installable PWA
 
 The [product lattice](docs/PRODUCT_LATTICE.md) and [real-device acceptance matrix](docs/UX_ACCEPTANCE.md) specify the minimal R8–R13 sequence to move from a polished pilot to an evidence-backed enterprise release. R8 introduces LUMEN design tokens, a public **/installazione** guide for Android Chrome and Windows Chrome/Edge, consent-aware Chrome notifications, a native keyboard-accessible confirmation dialog and honest guest/student/faculty/librarian copy. No UI framework or extra package is required.
