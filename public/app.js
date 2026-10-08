@@ -1,4 +1,5 @@
-import {libraryCopy,installExperience,pushExperience,actionConfirmation,localAvailability,localHoldResult,localStatus,localActionFeedback,localClickFeedback} from './experience.js';
+import {libraryCopy,installExperience,pushExperience,actionConfirmation,localHoldResult,localStatus,localActionFeedback,localClickFeedback} from './experience.js';
+import {projectLocalBook,projectKohaBook,projectLocalHold,projectLocalLoan,projectAcquisition,projectNotification,projectPatron,projectKohaOperation} from './projections.js';
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
 const dialog=document.querySelector('#lumen-dialog');
@@ -77,8 +78,9 @@ async function confirmation(action,trigger){
     dialog.showModal();
   });
 }
-function isStaff(){return state.user?.role==='librarian';}
-function isFaculty(){return state.user?.role==='faculty';}
+// These selectors show only UI affordances. Every mutation is authorized again server-side.
+function isStaff(){return projectPatron(state.user).capabilities.staff;}
+function isFaculty(){return projectPatron(state.user).capabilities.acquisitions;}
 function sectionTitle(title,intro=''){return '<div class="page-top"><h1>'+t(title)+'</h1><p class="muted">'+t(intro)+'</p></div>';}
 function field(label,name,placeholder='',required=true,type='text'){
   return '<label>'+t(label)+'<input type="'+type+'" name="'+name+'" placeholder="'+esc(placeholder)+'" '+(required?'required':'')+'></label>';
@@ -105,7 +107,8 @@ function header(){
 }
 function footer(){return '<footer class="shell footer"><div class="row"><span><strong>LUMEN</strong> · Il tuo spazio per la conoscenza</span><span>Servizi bibliotecari · <a data-nav href="/installazione">Installa app</a> · <a data-nav href="/impostazioni">Impostazioni</a></span></div></footer>';}
 function bookCard(b){
-  const availabilityState=localAvailability(b.available);const availability=badge(availabilityState.label,availabilityState.status==='available'?'':'warn');
+  const v=projectLocalBook(b,{role:state.user?.role});
+  const availability=badge(v.label,v.status==='available'?'':'warn');
   return '<article class="card book-card"><div class="cover">'+bookIcon+'</div><div style="flex:1;min-width:0"><h3><a data-nav href="/catalogo/'+esc(b.id)+'">'+t(b.title)+'</a></h3><p class="muted" style="margin-bottom:9px">'+t(b.author)+'<br><small>'+t(b.subject)+' · '+t(b.isbn||'ISBN non inserito')+'</small></p><div class="row">'+availability+'<a class="btn small alt" data-nav href="/catalogo/'+esc(b.id)+'">Dettagli →</a></div></div></article>';
 }
 async function home(){
@@ -127,32 +130,32 @@ async function catalog(){
 async function bookDetail(){
   const id=location.pathname.split('/')[2];
   const b=await api('/api/books/'+encodeURIComponent(id));
-  const localState=localAvailability(b.available);
+  const localState=projectLocalBook(b,{role:state.user?.role});
   return '<div class="page-top"><a class="fine" data-nav href="/catalogo">← Torna al catalogo</a></div>'
   +'<div class="layout section"><article class="card"><div class="book-card"><div class="cover" style="flex-basis:120px;height:160px">'+bookIcon+'</div><div><p class="eyebrow">Scheda bibliografica</p><h1 style="font-size:2rem">'+t(b.title)+'</h1><p>'+t(b.author)+'</p><p class="muted">'+t(b.subject)+' · ISBN '+t(b.isbn||'non presente')+'</p>'+badge(localState.label,localState.status==='available'?'':'warn')+'</div></div><hr class="divider"><p>'+t(b.description||'Descrizione non disponibile.')+'</p></article>'
   +'<aside class="card"><h2>Prenota il titolo</h2><p class="muted">Copie totali: '+b.copies+' · In prestito: '+b.borrowed+' · Prenotate: '+b.reserved+' · In coda: '+b.queue+'</p>'
   +(state.user?'<form data-form="hold"><input type="hidden" name="bookId" value="'+esc(b.id)+'"><button class="btn" type="submit">Invia prenotazione</button></form>':'<a class="btn" data-nav href="/accedi">Accedi per prenotare</a>')
-  +'<p class="fine" style="margin-top:14px">Le assegnazioni rispettano la disponibilità e l'+'&#39;'+'ordine delle richieste. Il ritiro si perfeziona al banco bibliotecario.</p></aside></div>';
+  +'<p class="fine" style="margin-top:14px">'+t(localState.helper)+'</p></aside></div>';
 }
 async function myLibrary(){
   const [holds,loans]=await Promise.all([api('/api/holds'),api('/api/loans')]);
   const active=loans.filter(l=>l.status==='active'),pending=holds.filter(h=>['queued','ready'].includes(h.status));
   return sectionTitle('La mia biblioteca','Consulta lo stato dei prestiti e delle prenotazioni LUMEN.')
   +'<div class="grid section"><div class="card"><p class="label">Prestiti attivi</p><p class="metric">'+active.length+'</p></div><div class="card"><p class="label">Prenotazioni aperte</p><p class="metric">'+pending.length+'</p></div><div class="card"><p class="label">Prossima scadenza</p><p class="metric" style="font-size:1.35rem">'+(active.length?humanDate(active.map(l=>l.due_at).sort()[0]):'Nessuna')+'</p></div></div>'
-  +'<section class="section"><h2>Prestiti</h2><div class="list">'+(loans.length?loans.map(l=>'<article class="card row space"><div><h3>'+t(l.title)+'</h3><p class="fine">Scadenza '+humanDate(l.due_at)+' · '+t(l.barcode)+'</p>'+badge(localStatus('loan',l.status).label,l.status==='active'?'':'gray')+'</div>'+(l.status==='active'&&l.renewal_count<1?btn('Rinnova','renew',l.id,'alt'):'')+'</article>').join(''):empty('Non hai ancora prestiti.'))+'</div></section>'
-  +'<section class="section"><h2>Prenotazioni</h2><div class="list">'+(holds.length?holds.map(h=>'<article class="card row space"><div><h3>'+t(h.title)+'</h3><p class="fine">Richiesta '+humanDate(h.created_at)+'</p>'+badge(localStatus('hold',h.status).label,h.status==='queued'?'warn':h.status==='cancelled'?'gray':'')+'</div>'+(['queued','ready'].includes(h.status)?btn('Annulla','cancel-hold',h.id,'ghost'):'')+'</article>').join(''):empty('Nessuna prenotazione.'))+'</div></section>';
+  +'<section class="section"><h2>Prestiti</h2><div class="list">'+(loans.length?loans.map(l=>'<article class="card row space"><div><h3>'+t(l.title)+'</h3><p class="fine">Scadenza '+humanDate(l.due_at)+' · '+t(l.barcode)+'</p>'+badge(projectLocalLoan(l).label,l.status==='active'?'':'gray')+'</div>'+(projectLocalLoan(l).action.enabled?btn(projectLocalLoan(l).action.label,'renew',l.id,'alt'):'')+'</article>').join(''):empty('Non hai ancora prestiti.'))+'</div></section>'
+  +'<section class="section"><h2>Prenotazioni</h2><div class="list">'+(holds.length?holds.map(h=>'<article class="card row space"><div><h3>'+t(h.title)+'</h3><p class="fine">Richiesta '+humanDate(h.created_at)+'</p>'+badge(projectLocalHold(h).label,h.status==='queued'?'warn':h.status==='cancelled'?'gray')+'</div>'+(projectLocalHold(h).action.enabled?btn(projectLocalHold(h).action.label,'cancel-hold',h.id,'ghost'):'')+'</article>').join(''):empty('Nessuna prenotazione.'))+'</div></section>';
 }
 async function suggestions(){
   if(!isFaculty()) return forbidden();
   const rows=await api('/api/suggestions');
   return sectionTitle('Proposte d’acquisto','Suggerisci un titolo utile per didattica e ricerca.')
   +'<div class="layout section"><div class="card"><h2>Nuova richiesta</h2><form class="form" data-form="suggest">'+field('Titolo','title','Titolo del libro')+field('Autore','author','Autore o curatore')+field('ISBN','isbn','Facoltativo',false)+'<label>Motivazione didattica o di ricerca<textarea name="reason" required maxlength="500" placeholder="Perché la biblioteca dovrebbe acquisirlo?"></textarea></label><button class="btn" type="submit">Invia proposta</button></form></div>'
-  +'<div><h2>Le mie proposte</h2><div class="list">'+(rows.length?rows.map(r=>'<article class="card"><h3>'+t(r.title)+'</h3><p class="fine">'+t(r.author)+' · '+humanDate(r.created_at)+'</p>'+badge(localStatus('suggestion',r.status).label,r.status==='rejected'?'warn':'')+'</article>').join(''):empty('Ancora nessuna proposta.'))+'</div></div></div>';
+  +'<div><h2>Le mie proposte</h2><div class="list">'+(rows.length?rows.map(r=>'<article class="card"><h3>'+t(r.title)+'</h3><p class="fine">'+t(r.author)+' · '+humanDate(r.created_at)+'</p>'+badge(projectAcquisition(r).label,r.status==='rejected'?'warn':'')+'<p class="fine">'+t(projectAcquisition(r).helper)+'</p></article>').join(''):empty('Ancora nessuna proposta.'))+'</div></div></div>';
 }
 async function notifications(){
   const rows=await api('/api/notifications');
   return sectionTitle('Comunicazioni','Aggiornamenti su prestiti, richieste e servizi della biblioteca.')
-  +'<div class="list section">'+(rows.length?rows.map(n=>'<article class="card row space"><div><h3>'+t(n.title)+'</h3><p>'+t(n.body)+'</p><p class="fine">'+humanDate(n.created_at)+' · '+(n.read_at?'Letta':'Da leggere')+'</p></div>'+(n.read_at?'':btn('Segna come letta','read',n.id,'alt'))+'</article>').join(''):empty('Non hai notifiche.'))+'</div>';
+  +'<div class="list section">'+(rows.length?rows.map(n=>'<article class="card row space"><div><h3>'+t(n.title)+'</h3><p>'+t(n.body)+'</p><p class="fine">'+humanDate(n.created_at)+' · '+t(projectNotification(n).label)+'</p></div>'+(projectNotification(n).action.enabled?btn(projectNotification(n).action.label,'read',n.id,'alt'):'')+'</article>').join(''):empty('Non hai notifiche.'))+'</div>';
 }
 async function staff(){
   if(!isStaff())return forbidden();
@@ -168,7 +171,7 @@ async function staff(){
   +'<div class="card"><h2>Copia e catalogo</h2><form class="form" data-form="book">'+field('Titolo','title')+field('Autore','author')+field('ISBN','isbn','ISBN',false)+field('Materia','subject','Materia',false)+field('Scaffale','shelf','Collocazione',false)+field('Numero copie','copies','1',true,'number')+'<button class="btn" type="submit">Registra titolo e copie</button></form></div></div>'
   +'<section class="section"><h2>Prestiti da gestire</h2><div class="card table-wrap"><table class="table"><thead><tr><th>Titolo</th><th>Utente</th><th>Scadenza</th><th>Operazione</th></tr></thead><tbody>'+data.activeLoans.map(x=>'<tr><td>'+t(x.title)+'</td><td>'+t(x.patron)+'</td><td>'+humanDate(x.due_at)+'</td><td>'+btn('Restituisci','return',x.id,'alt')+'</td></tr>').join('')+'</tbody></table>'+(moneyless(data.activeLoans)?empty('Nessun prestito attivo'):'')+'</div></section>'
   +'<section class="section"><h2>Ritiri pronti</h2><div class="grid">'+(data.readyHolds.length?data.readyHolds.map(x=>'<div class="card"><h3>'+t(x.title)+'</h3><p>'+t(x.patron)+'</p>'+btn('Consegna copia','issue-ready',x.book_id+'|'+x.user_id,'alt')+'</div>').join(''):empty('Nessun ritiro in attesa.'))+'</div></section>'
-  +'<section class="section"><h2>Proposte d’acquisto</h2><div class="list">'+(suggestions.length?suggestions.map(x=>'<div class="card row space"><div><h3>'+t(x.title)+'</h3><p class="fine">'+t(x.author)+' · Richiesta da '+t(x.requester)+'</p><p>'+t(x.reason)+'</p>'+badge(localStatus('suggestion',x.status).label)+'</div><div class="row">'+(x.status==='pending'?btn('Approva','approve',x.id,'alt')+btn('Rifiuta','reject',x.id,'ghost'):'')+(x.status==='approved'?btn('Ordinato','ordered',x.id,'alt'):'')+'</div></div>').join(''):empty('Nessuna proposta.'))+'</div></section>'
+  +'<section class="section"><h2>Proposte d’acquisto</h2><div class="list">'+(suggestions.length?suggestions.map(x=>'<div class="card row space"><div><h3>'+t(x.title)+'</h3><p class="fine">'+t(x.author)+' · Richiesta da '+t(x.requester)+'</p><p>'+t(x.reason)+'</p>'+badge(projectAcquisition(x).label)+'</div><div class="row">'+(x.status==='pending'?btn('Approva','approve',x.id,'alt')+btn('Rifiuta','reject',x.id,'ghost'):'')+(x.status==='approved'?btn('Ordinato','ordered',x.id,'alt'):'')+'</div></div>').join(''):empty('Nessuna proposta.'))+'</div></section>'
   +'<section class="section"><h2>Account abilitati</h2><div class="card table-wrap"><table class="table"><thead><tr><th>Nome</th><th>Profilo</th><th>Stato</th><th>Operazione</th></tr></thead><tbody>'+users.map(x=>'<tr><td>'+t(x.name)+'<br><span class="fine">'+t(x.email)+'</span></td><td>'+t(x.role)+'</td><td>'+badge(x.active?'Attivo':'Disattivato',x.active?'':'gray')+'</td><td>'+(x.active&&x.id!==state.user.id?btn('Disattiva','disable',x.id,'ghost'):'')+'</td></tr>').join('')+'</tbody></table></div></section>'
   +'<div class="layout section"><div class="card"><h2>Nuovo utente</h2><form class="form" data-form="user">'+field('Nome e cognome','name')+field('Email istituzionale','email','utente@istituzione.it',true,'email')+'<label>Profilo<select name="role"><option value="student">Studente</option><option value="faculty">Docente</option><option value="librarian">Bibliotecario</option></select></label>'+field('Password temporanea (12+ caratteri)','password','Minimo 12 caratteri',true,'password')+'<button class="btn" type="submit">Crea account</button></form></div>'
   +'<div class="card"><h2>Avviso collettivo</h2><form class="form" data-form="broadcast"><label>Destinatari<select name="role"><option value="all">Tutti</option><option value="student">Studenti</option><option value="faculty">Docenti</option><option value="librarian">Bibliotecari</option></select></label>'+field('Oggetto','title')+'<label>Testo<textarea name="body" required maxlength="600"></textarea></label><button class="btn" type="submit">Invia alla inbox</button></form></div></div>';
@@ -218,7 +221,7 @@ async function kohaCatalog(){
   const q=new URLSearchParams(location.search).get('q')||'';
   const result=await api('/api/integrations/koha/books?q='+encodeURIComponent(q));
   const items=result.items||[];
-  const cards=items.map(b=>'<article class="card book-card"><div class="cover">'+bookIcon+'</div><div><h3><a data-nav href="/koha/'+esc(b.id.slice(5))+'">'+t(b.title)+'</a></h3><p class="fine">'+t(b.author)+' · '+t(b.isbn||'ISBN non presente')+'</p>'+badge(state.kohaWrite?'Koha · prenotazioni pilota':'Catalogo Koha · sola lettura','gray')+'</div></article>').join('');
+  const cards=items.map(b=>'<article class="card book-card"><div class="cover">'+bookIcon+'</div><div><h3><a data-nav href="/koha/'+esc(b.id.slice(5))+'">'+t(b.title)+'</a></h3><p class="fine">'+t(b.author)+' · '+t(b.isbn||'ISBN non presente')+'</p>'+badge(projectKohaBook(b,{configured:state.koha,writeEnabled:state.kohaWrite,role:state.user?.role}).label,'gray')+'</div></article>').join('');
   return sectionTitle('Catalogo Koha',state.kohaWrite?'Fonte Koha: ricerca e prenotazioni per utenti verificati.':'Fonte Koha in sola lettura.')
     +'<form class="searchbar" data-form="koha-search"><input name="query" placeholder="Titolo, autore o ISBN" value="'+esc(q)+'" aria-label="Cerca su Koha"><button class="btn gold" type="submit">Cerca</button></form>'
     +'<section class="section"><div class="grid">'+(cards||empty('Nessun risultato da Koha.'))+'</div>'+(result.truncated?'<p class="fine">Sono disponibili altri record: la paginazione avanzata sarà introdotta nel gate K2.</p>':'')+'</section>';
@@ -226,17 +229,19 @@ async function kohaCatalog(){
 async function kohaDetail(){
   const id=location.pathname.split('/')[2];
   const b=await api('/api/integrations/koha/books/'+encodeURIComponent(id));
-  let action='';
+  let action='',mapped=false;
   if(state.kohaWrite){
     if(!state.user)action='<a class="btn" data-nav href="/accedi">Accedi per prenotare</a>';
     else{
       const binding=await api('/api/integrations/koha/my/binding');
-      action=binding.mapped?'<form class="form" data-form="koha-hold"><input name="biblioId" value="'+esc(id)+'" type="hidden"><p class="fine">Prenotazione gestita direttamente da Koha. La disponibilità e la posizione in coda sono determinate da Koha.</p><button class="btn" type="submit">Richiedi prenotazione Koha</button></form>'
+      mapped=binding.mapped===true;
+      action=mapped?'<form class="form" data-form="koha-hold"><input name="biblioId" value="'+esc(id)+'" type="hidden"><p class="fine">Prenotazione gestita direttamente da Koha. La disponibilità e la posizione in coda sono determinate da Koha.</p><button class="btn" type="submit">Richiedi prenotazione Koha</button></form>'
         :'<p class="alert">Account Koha non associato. Chiedi alla biblioteca di verificare e collegare la tua identità.</p>';
     }
   }
+  const kohaView=projectKohaBook(b,{configured:state.koha,writeEnabled:state.kohaWrite,mapped,role:state.user?.role});
   return '<div class="page-top"><a data-nav href="/koha">← Torna a Koha</a><h1>'+t(b.title)+'</h1><p>'+t(b.author)+'</p><p>'+t(b.isbn)+'</p></div>'
-    +'<div class="card"><h2>Copie registrate: '+Number(b.copies)+'</h2><p class="alert">La disponibilità al prestito deve essere verificata su Koha; LUMEN non calcola le copie disponibili di questa collezione.</p>'+action
+    +'<div class="card"><h2>Copie registrate: '+Number(b.copies)+'</h2><p class="alert">'+t(kohaView.label)+'. '+t(kohaView.helper)+'</p>'+action
     +'<div class="list">'+(b.items||[]).map(c=>'<div class="row"><span>'+t(c.barcode||'Copia')+'</span><span class="fine">'+t(c.shelf)+'</span></div>').join('')+'</div></div>';
 }
 async function kohaMyHolds(){
@@ -251,7 +256,7 @@ async function kohaPending(){
   if(!isStaff())return forbidden();
   const pending=await api('/api/staff/koha/pending');
   return sectionTitle('Operazioni Koha da riconciliare','L’esito remoto può essere stato registrato nonostante un timeout. Nessun retry automatico.')
-    +'<div class="list section">'+(pending.length?pending.map(x=>'<article class="card"><h3>Record Koha '+Number(x.biblio_id)+'</h3><p class="fine">Patron #'+Number(x.patron_id)+' · Stato: '+t(x.state)+' · Errore: '+t(x.error_code||'non determinato')+'</p><p>Verifica il record su Koha, poi inserisci il suo identificativo autentico.</p><form class="form" data-form="koha-reconcile"><input type="hidden" name="attemptId" value="'+esc(x.id)+'">'+field('ID prenotazione Koha','holdId','ID confermato',true,'number')+'<button class="btn small" type="submit">Verifica e riconcilia</button></form></article>').join(''):empty('Nessuna operazione incerta.'))+'</div>';
+    +'<div class="list section">'+(pending.length?pending.map(x=>'<article class="card"><h3>Record Koha '+Number(x.biblio_id)+'</h3><p class="fine">Patron #'+Number(x.patron_id)+' · '+t(projectKohaOperation(x).label)+' · Errore: '+t(x.error_code||'non determinato')+'</p><p>'+t(projectKohaOperation(x).helper)+'</p><form class="form" data-form="koha-reconcile"><input type="hidden" name="attemptId" value="'+esc(x.id)+'">'+field('ID prenotazione Koha','holdId','ID confermato',true,'number')+'<button class="btn small" type="submit">Verifica e riconcilia</button></form></article>').join(''):empty('Nessuna operazione incerta.'))+'</div>';
 }
 
 async function kohaMyLoans(){
@@ -267,7 +272,7 @@ async function kohaLoanPending(){
   if(!isStaff())return forbidden();
   const pending=await api('/api/staff/koha/loans-pending');
   return sectionTitle('Prestiti Koha da verificare','Non ripetere i POST con esito incerto: verifica prima la ricevuta nel gestionale.')
-    +'<div class="list section">'+(pending.length?pending.map(x=>'<article class="card"><h3>'+t(x.kind==='renew'?'Rinnovo':'Prestito')+' per patron #'+Number(x.patron_id)+'</h3><p class="fine">Item #'+t(x.item_id||'da verificare')+' · Stato '+t(x.state)+' · '+t(x.error_code||'nessun codice')+'</p>'
+    +'<div class="list section">'+(pending.length?pending.map(x=>'<article class="card"><h3>'+t(x.kind==='renew'?'Rinnovo':'Prestito')+' per patron #'+Number(x.patron_id)+'</h3><p class="fine">Item #'+t(x.item_id||'da verificare')+' · '+t(projectKohaOperation(x).label)+' · '+t(x.error_code||'nessun codice')+'</p>'
     +'<form data-form="koha-loan-reconcile" class="form"><input type="hidden" name="attemptId" value="'+esc(x.id)+'">'+field('ID prestito Koha accertato','checkoutId','ID verificato su Koha',true,'number')+'<button type="submit" class="btn small">Verifica ricevuta</button></form></article>').join(''):empty('Nessuna operazione da verificare.'))+'</div>';
 }
 
