@@ -88,7 +88,16 @@ export function createService(s) {
       });
       return { token, user:{id:u.id,name:u.name,role:u.role,email:u.email}, csrf };
     },
-    logout(token) { if(token) s.run("DELETE FROM sessions WHERE token_hash=?",tokenHash(token)); },
+    logout(token) {
+      if(!token)return;
+      // Server-side revocation is authoritative even if browser SW is offline
+      // and pushManager.unsubscribe() fails. Never revoke other device sessions.
+      s.tx(()=>{
+        const hash=tokenHash(token);
+        s.run('DELETE FROM subscriptions WHERE session_hash=?',hash);
+        s.run('DELETE FROM sessions WHERE token_hash=?',hash);
+      });
+    },
     books(query='') {
       const q=str(query,120);
       const currentRevision=s.get('SELECT version FROM catalogue_revision WHERE id=1').version;
@@ -290,15 +299,35 @@ export function createService(s) {
         return {recipients:users.length};
       });
     },
-    subscribe(user,subscription) {
+    subscribe(user,subscription,token) {
       requireRole(user,['student','faculty','librarian']);
+      if(!token || typeof token!=='string')fail(401,'AUTH_REQUIRED','Sessione necessaria per registrare questo dispositivo');
+      const sessionHash=tokenHash(token);
+      const session=s.get('SELECT user_id FROM sessions WHERE token_hash=? AND expires_at>?',sessionHash,now());
+      if(session?.user_id!==user.id)fail(401,'AUTH_REQUIRED','Sessione scaduta o non associata');
       let endpointHost='';
-      try {const url=new URL(subscription?.endpoint); if(url.protocol!=='https:'||url.username||url.password||url.port) throw 0; endpointHost=url.hostname.toLowerCase();} catch {fail(400,'INPUT_INVALID','Endpoint push non valido');}
+      try {
+        const url=new URL(subscription?.endpoint);
+        if(url.protocol!=='https:'||url.username||url.password||url.port||url.hash)throw 0;
+        endpointHost=url.hostname.toLowerCase();
+      } catch {fail(400,'INPUT_INVALID','Endpoint push non valido');}
       const approved=['fcm.googleapis.com','fcm-xm.googleapis.com','android.googleapis.com','updates.push.services.mozilla.com','web.push.apple.com'];
-      if(!approved.includes(endpointHost)&&!endpointHost.endsWith('.notify.windows.com')&&!endpointHost.endsWith('.push.apple.com')) fail(400,'PUSH_PROVIDER_DENIED','Provider push non consentito');
-      if(!subscription || typeof subscription.endpoint!=='string' || subscription.endpoint.length>2000 || !subscription.keys?.p256dh || !subscription.keys?.auth) fail(400,'INPUT_INVALID','Sottoscrizione push non valida');
-      s.run('INSERT INTO subscriptions(endpoint,user_id,payload,created_at) VALUES(?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,payload=excluded.payload,created_at=excluded.created_at',subscription.endpoint,user.id,JSON.stringify(subscription),now());
-      return {ok:true};
+      if(!approved.includes(endpointHost)&&!endpointHost.endsWith('.notify.windows.com')&&!endpointHost.endsWith('.push.apple.com'))
+        fail(400,'PUSH_PROVIDER_DENIED','Provider push non consentito');
+      const validKey=x=>typeof x==='string'&&x.length>=20&&x.length<=120&&/^[A-Za-z0-9_-]+={0,2}$/.test(x);
+      if(typeof subscription?.endpoint!=='string'||subscription.endpoint.length>2000||
+        !validKey(subscription.keys?.p256dh)||!validKey(subscription.keys?.auth))
+        fail(400,'INPUT_INVALID','Sottoscrizione push non valida');
+      return s.tx(()=>{
+        const existing=s.get('SELECT user_id FROM subscriptions WHERE endpoint=?',subscription.endpoint);
+        if(existing&&existing.user_id!==user.id)
+          fail(409,'PUSH_ENDPOINT_IN_USE','Il dispositivo ha una sottoscrizione di un altro account. Disattivala dal browser e riprova.');
+        // A current account may refresh its own endpoint after a renewed login.
+        // We never silently transfer a delivery address across account IDs.
+        s.run("INSERT INTO subscriptions(endpoint,user_id,payload,created_at,session_hash) VALUES(?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET payload=excluded.payload,created_at=excluded.created_at,session_hash=excluded.session_hash",
+          subscription.endpoint,user.id,JSON.stringify(subscription),now(),sessionHash);
+        return {ok:true};
+      });
     },
     unsubscribe(user,endpoint) {
       requireRole(user,['student','faculty','librarian']);
