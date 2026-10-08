@@ -68,3 +68,6 @@ Koha-authoritative patron holds are implemented behind `KOHA_CIRCULATION_ENABLED
 - Enterprise gating for SSO, 2000 sessions on actual Koha/Render, off-site RPO/RTO, security and accessibility remains open.
 
 R4 must not be marketed as enterprise ILS production ready even after normal review and merge.
+## R5 draft — return evidence, not remote check-in
+
+Implemented as a separate OFF-by-default R5 feature: staff-only return ticket preparation, positive Koha history reconciliation and one audited receipt, with test-only Koha mocks. Never mark a return complete on a missing active checkout or 404. External check-in must still happen in Koha's own circulation workflow. The R5 live read-only smoke is not executed without fixture credentials. Enterprise release class remains BLOCKED.

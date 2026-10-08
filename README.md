@@ -53,6 +53,14 @@ See [R4 loan contracts, verification and DoD](docs/KOHA_LOANS.md).
 DO NOT enable R4 on public production without testing your real Koha instance and operator permissions.
 Returns/check-ins, institutional SSO and enterprise scale/recovery certification remain unfinished.
 
+## R5 staff-assisted Koha return verification
+
+R5 adds `/staff/koha-returns` and a positive-evidence check-in verification ticket. A librarian registers the physical return in **Koha staff circulation first**; LUMEN verifies it against Koha's returned-checkout history and records an audit receipt. LUMEN never invents or performs a Koha check-in mutation.
+
+The workflow is disabled by default and requires `KOHA_RETURNS_ENABLED=1` together with the R3/R4 flags. Details, staging acceptance, and failure semantics: [R5 Koha return contracts](docs/KOHA_RETURNS.md).
+
+Check a controlled live Koha fixture without changing library data: `GIT_SHA=$(git rev-parse HEAD) npm run koha:return-smoke`. No live production validation has been executed.
+
 ## Non-negotiable architectural boundaries
 
 - **Standalone mode**: self-contained lightweight single-library circulation, not a full ILS. It does **not** claim MARC cataloguing, federated OPAC, inter-library lending, fines, serials or Koha parity.
