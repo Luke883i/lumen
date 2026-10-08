@@ -32,6 +32,12 @@ if(process.env.KOHA_LOANS_ENABLED==='1'){
     /^[A-Za-z0-9_-]{1,20}$/.test(process.env.KOHA_PICKUP_LIBRARY_ID||''),
     'Koha loans require circulation flag, scoped API credentials and library code');
 }
+if(process.env.KOHA_RETURNS_ENABLED==='1'){
+  record('koha-return-feature-dependency',
+    process.env.KOHA_CIRCULATION_ENABLED==='1'&&process.env.KOHA_LOANS_ENABLED==='1'&&
+    !!(process.env.KOHA_BASE_URL&&process.env.KOHA_CLIENT_ID&&process.env.KOHA_CLIENT_SECRET),
+    'Return confirmation requires configured Koha loans and OAuth2 credentials');
+}
 const path=process.env.LUMEN_DB_PATH;
 if(path&&existsSync(path)){
   try{
