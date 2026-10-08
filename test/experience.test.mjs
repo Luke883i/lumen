@@ -181,7 +181,7 @@ test('UX-S5 web shell caches the interaction guard for PWA offline navigation',(
  assert.ok(sw.includes("'/interaction.js'"));
  assert.ok(app.includes('createRenderEpoch()'));
  assert.ok(app.includes('renderEpoch.latest(ticket)'));
- assert.ok(app.includes("aria-busy"));
+ assert.ok(load('public/interaction.js').includes("aria-busy"));
  assert.ok(app.includes("showActionResult('hold'"));
  assert.ok(app.includes("mutationFailure({method,transport:'network'})"));
 });
