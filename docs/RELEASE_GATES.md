@@ -85,3 +85,7 @@ The canonical boot is `npm run dev` in a fresh Node 24 Codespace, with postCreat
 ### R7 canary enhancement
 
 Render `autoDeployTrigger: checksPass` waits for GitHub checks; a public `/api/version` endpoint exposes only service, environment mode and deployment Git SHA (from Render's documented `RENDER_GIT_COMMIT`). `EXPECTED_SHA=... npm run verify:remote -- https://...` refuses mismatched commits, missing DB health, or absent PWA. CI validates this script with an isolated server fixture; a real Render service remains unverified until the operator runs it.
+
+## R8 — UI experience, PWA install and notifications (feature-complete candidate)
+
+Implemented: deterministic install/permission helper with test-covered platform branches; LUMEN CSS primitives, native dialog, user-specific push consent states, account logout subscription opt-out, SW safe-click same-origin focus and lock-screen privacy, manifest shortcuts and offline shell. Browser install is a browser-controlled prompt (or manual Chrome menu action), not native APK. Web Push requires VAPID. A real Android and Windows Chrome acceptance test and WCAG review are still BLOCKED; no production enterprise label follows from a green Node CI.

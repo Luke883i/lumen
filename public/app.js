@@ -1,5 +1,7 @@
+import {libraryCopy,installExperience,pushExperience,actionConfirmation} from './experience.js';
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
+const dialog=document.querySelector('#lumen-dialog');
 const state={user:null,csrf:null,install:null,koha:false,kohaWrite:false,kohaLoans:false,kohaReturns:false,oidcEnabled:false,oidcOnly:false};
 const retryKeys=new Map();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -48,9 +50,33 @@ async function api(path,method='GET',body) {
 }
 function message(text,bad=false) {
   toast.textContent=text;toast.className='toast'+(bad?' error':'');toast.hidden=false;
+  toast.setAttribute('role',bad?'alert':'status');
+  toast.setAttribute('aria-live',bad?'assertive':'polite');
   clearTimeout(message.timer);message.timer=setTimeout(()=>toast.hidden=true,4700);
 }
-function navigate(to) {history.pushState({},'',to);render();window.scrollTo({top:0,behavior:'instant'});}
+function navigate(to) {
+  history.pushState({},'',to);
+  render().then(()=>document.querySelector('#main')?.focus({preventScroll:true}));
+  window.scrollTo({top:0,behavior:'instant'});
+}
+const installModel=()=>installExperience({
+  standalone:matchMedia('(display-mode: standalone)').matches||navigator.standalone===true,
+  canPrompt:!!state.install,userAgent:navigator.userAgent
+});
+async function confirmation(action,trigger){
+  const cfg=actionConfirmation(action);
+  if(!cfg)return true;
+  if(!dialog?.showModal)return window.confirm(cfg.title+' '+cfg.detail);
+  dialog.querySelector('#dialog-title').textContent=cfg.title;
+  dialog.querySelector('#dialog-detail').textContent=cfg.detail;
+  const yes=dialog.querySelector('#dialog-confirm');
+  yes.textContent=cfg.confirm;yes.classList.toggle('danger-action',!!cfg.danger);
+  dialog.returnValue='';
+  return await new Promise(resolve=>{
+    dialog.addEventListener('close',()=>{const accepted=dialog.returnValue==='confirm';if(trigger?.isConnected)trigger.focus();resolve(accepted);},{once:true});
+    dialog.showModal();
+  });
+}
 function isStaff(){return state.user?.role==='librarian';}
 function isFaculty(){return state.user?.role==='faculty';}
 function sectionTitle(title,intro=''){return '<div class="page-top"><h1>'+t(title)+'</h1><p class="muted">'+t(intro)+'</p></div>';}
@@ -77,20 +103,20 @@ function header(){
   const bottom=nav.filter(([p])=>['/','/catalogo','/me','/notifiche','/staff','/acquisti'].includes(p)).slice(0,5).map(([p,label])=>routeLink(p,label,current(p))).join('');
   return '<header class="site-header shell">'+logo+'<nav class="nav" aria-label="Navigazione principale">'+linkNav+account+'</nav></header><nav class="bottom-nav" aria-label="Navigazione mobile">'+bottom+'</nav>';
 }
-function footer(){return '<footer class="shell footer"><div class="row"><span><strong>LUMEN</strong> · Il tuo spazio per la conoscenza</span><span>Servizi bibliotecari · v1.0 · <a data-nav href="/impostazioni">Impostazioni</a></span></div></footer>';}
+function footer(){return '<footer class="shell footer"><div class="row"><span><strong>LUMEN</strong> · Il tuo spazio per la conoscenza</span><span>Servizi bibliotecari · <a data-nav href="/installazione">Installa app</a> · <a data-nav href="/impostazioni">Impostazioni</a></span></div></footer>';}
 function bookCard(b){
   const availability=b.available>0?badge(b.available+' disponibil'+(b.available===1?'e':'i')):badge('In attesa','warn');
   return '<article class="card book-card"><div class="cover">'+bookIcon+'</div><div style="flex:1;min-width:0"><h3><a data-nav href="/catalogo/'+esc(b.id)+'">'+t(b.title)+'</a></h3><p class="muted" style="margin-bottom:9px">'+t(b.author)+'<br><small>'+t(b.subject)+' · '+t(b.isbn||'ISBN non inserito')+'</small></p><div class="row">'+availability+'<a class="btn small alt" data-nav href="/catalogo/'+esc(b.id)+'">Dettagli →</a></div></div></article>';
 }
 async function home(){
   const books=await api('/api/books');
-  return '<section class="hero"><div><p class="eyebrow">La tua biblioteca, ovunque</p><h1>Ogni libro apre una possibilità.</h1><p>Scopri il catalogo, prenota libri e gestisci i tuoi prestiti. Un ambiente semplice per studiare, insegnare e fare ricerca.</p>'+formSearch()+'</div><div class="hero-art">'+bookIcon+'</div></section>'
+  return '<section class="hero"><div><p class="eyebrow">La tua biblioteca, ovunque</p><h1>Ogni libro apre una possibilità.</h1><p>'+t(libraryCopy.services)+'</p>'+formSearch()+'<p class="fine" style="margin-top:16px"><a data-nav href="/installazione" style="color:#f0d68d;text-decoration:underline">Porta LUMEN sul tuo dispositivo →</a></p>'+'</div><div class="hero-art">'+bookIcon+'</div></section>'
   +'<section class="section"><div class="section-head"><h2>Un luogo, tanti servizi</h2></div><div class="grid">'
   +'<article class="card service-card">'+ic('search')+'<h3>Esplora il patrimonio</h3><p class="muted">Cerca per autore, titolo, ISBN o materia e controlla le copie disponibili.</p></article>'
   +'<article class="card service-card">'+ic('clock')+'<h3>Prenota senza attese</h3><p class="muted">Richiedi un volume e segui lo stato della coda dalla tua area personale.</p></article>'
   +'<article class="card service-card">'+ic('cap')+'<h3>Sostieni la ricerca</h3><p class="muted">I docenti possono proporre nuovi acquisti e seguirne l'+'&#39;'+'iter.</p></article></div></section>'
   +'<section class="section"><div class="section-head"><h2>Dal catalogo</h2><a class="btn alt small" data-nav href="/catalogo">Vedi tutti →</a></div><div class="grid">'+(books.length?books.slice(0,3).map(bookCard).join(''):empty('Il catalogo sarà disponibile a breve.'))+'</div></section>'
-  +'<section class="section"><div class="card"><h2>La biblioteca e LUMEN</h2><p>Un punto di accesso ai servizi bibliotecari per studenti, docenti e bibliotecari. LUMEN concentra catalogo, richieste, prestiti e comunicazioni in una web app installabile. Gli orari, le sedi e i contatti devono essere configurati dalla biblioteca prima del rilascio pubblico.</p><p class="fine">Servizio pilota autonomo: non sostituisce tutte le funzioni di un sistema ILS accademico.</p></div></section>';
+  +'<section class="section"><div class="card"><h2>La biblioteca e LUMEN</h2><p>'+t(libraryCopy.context)+'</p><p>LUMEN è il punto di accesso digitale ai servizi bibliotecari: non sostituisce i sistemi gestionali della biblioteca e mantiene separati gli esiti delle integrazioni esterne.</p><p class="fine">Sedi, orari, contatti e condizioni di prestito saranno indicati dalla biblioteca prima della pubblicazione ufficiale.</p></div></section>';
 }
 async function catalog(){
   const q=new URLSearchParams(location.search).get('q')||'';
@@ -149,15 +175,34 @@ async function staff(){
 function forbidden(){return sectionTitle('Accesso non consentito','Il tuo profilo non dispone delle autorizzazioni richieste.')+'<a class="btn" data-nav href="/">Torna alla home</a>';}
 function login(){
   if(state.user)return sectionTitle('Sei già connesso','Accedi alle tue funzioni dal menu.')+'<a data-nav class="btn" href="/me">La mia biblioteca</a>';
-  return '<div class="layout section"><div class="card"><p class="eyebrow">Accesso riservato</p><h1 style="font-size:2.5rem">Bentornato su LUMEN.</h1><p class="muted">Accedi con l’identità istituzionale o con le credenziali autorizzate dalla biblioteca.</p>'+(state.oidcEnabled?'<a class="btn" href="/api/auth/oidc/start">Accedi con Single Sign-On</a>':'')+(new URLSearchParams(location.search).has('auth_error')?'<p class="alert">Accesso istituzionale non completato. Contatta la biblioteca per verificare l’associazione dell’account.</p>':'')+(state.oidcOnly?'':'<form class="form" data-form="login">'+field('Email','email','nome@universita.it',true,'email')+field('Password','password','La tua password',true,'password')+'<button class="btn" type="submit">Accedi</button></form>')+'</div><div class="card"><h2>Tre profili, una piattaforma</h2><p><strong>Studente</strong> · Catalogo, prestiti e prenotazioni.</p><p><strong>Docente</strong> · Tutto ciò che serve per lo studio e le proposte di acquisto.</p><p><strong>Bibliotecario</strong> · Banco prestiti, gestione e comunicazioni.</p><p class="fine">Nessuna registrazione pubblica: gli utenti vengono abilitati dalla biblioteca.</p></div></div>';
+  return '<div class="layout section"><div class="card"><p class="eyebrow">Accesso riservato</p><h1 style="font-size:2.5rem">Bentornato su LUMEN.</h1><p class="muted">Accedi con l’identità istituzionale o con le credenziali autorizzate dalla biblioteca.</p>'+(state.oidcEnabled?'<a class="btn" href="/api/auth/oidc/start">Accedi con Single Sign-On</a>':'')+(new URLSearchParams(location.search).has('auth_error')?'<p class="alert">Accesso istituzionale non completato. Contatta la biblioteca per verificare l’associazione dell’account.</p>':'')+(state.oidcOnly?'':'<form class="form" data-form="login">'+field('Email','email','nome@universita.it',true,'email')+field('Password','password','La tua password',true,'password')+'<button class="btn" type="submit">Accedi</button></form>')+'</div><div class="card"><h2>Tre profili, una piattaforma</h2><p>'+t(libraryCopy.roles.student)+'</p><p>'+t(libraryCopy.roles.faculty)+'</p><p>'+t(libraryCopy.roles.librarian)+'</p><p class="fine">Nessuna registrazione pubblica: gli utenti vengono abilitati dalla biblioteca.</p></div></div>';
+}
+function installPage(){
+  const x=installModel();
+  const button=x.canInstall?'<button class="btn" data-click="install" type="button">Installa LUMEN</button>':'';
+  return sectionTitle('LUMEN sul tuo dispositivo','La stessa biblioteca, dal browser o come app sulla schermata Home.')
+    +'<section class="section install-panel"><div><p class="eyebrow">PWA · LUMEN</p><h2>'+t(x.title)+'</h2><p>'+t(x.detail)+'</p></div><div class="actions">'+button
+    +'<a class="btn ghost" data-nav href="/catalogo">Vai al catalogo</a></div></section>'
+    +'<div class="grid two section"><article class="card"><h3>Android · Chrome</h3><p>Apri LUMEN su HTTPS, poi usa il comando Installa app oppure Aggiungi alla schermata Home dal menu Chrome. L’app avrà un’icona nel launcher.</p></article>'
+    +'<article class="card"><h3>Windows · Chrome o Edge</h3><p>Apri il menu del browser e seleziona Installa LUMEN, quando disponibile. Si aprirà in una finestra dedicata, senza installare un programma nativo.</p></article></div>'
+    +'<p class="fine">L’installazione dipende dalle capacità e dalle condizioni del browser. Non è un file APK o un’app di Play Store. Serve HTTPS per l’installazione sul dispositivo.</p>';
 }
 async function settings(){
   if(!state.user)return login();
   const cfg=await api('/api/push-config');
-  const status=cfg.enabled?'Le notifiche browser sono disponibili, previa autorizzazione.':'La push non è configurata sul server; la inbox resta disponibile.';
+  const supported='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
+  let subscribed=false;
+  if(cfg.enabled&&supported&&Notification.permission==='granted'){
+    try{const reg=await navigator.serviceWorker.getRegistration('/');subscribed=!!(await reg?.pushManager?.getSubscription());}catch{}
+  }
+  const push=pushExperience({serverEnabled:cfg.enabled,secure:window.isSecureContext,
+    supported,permission:supported?Notification.permission:'default',subscribed});
   return sectionTitle('Impostazioni','Il tuo account e le preferenze di comunicazione.')
     +'<div class="layout section"><div class="card"><h2>Profilo</h2><p><strong>'+t(state.user.name)+'</strong><br>'+t(state.user.email)+'<br>'+badge({student:'Studente',faculty:'Docente',librarian:'Bibliotecario'}[state.user.role])+'</p>'+btn('Esci','logout','','ghost')+'<hr class="divider"><form class="form" data-form="change-password"><h3>Cambia password</h3>'+field('Password attuale','oldPassword','',true,'password')+field('Nuova password (12+ caratteri)','newPassword','',true,'password')+'<button class="btn small" type="submit">Aggiorna password</button></form></div>'
-    +'<div class="card"><h2>Notifiche</h2><p class="muted">'+t(status)+'</p>'+(cfg.enabled?btn('Attiva notifiche push','enable-push','','alt'):'')+'<p class="fine">Puoi installare questa web app dal menu del browser (Installa app/Aggiungi alla schermata Home).</p><button class="btn alt small" type="button" data-click="install" id="install" style="display:none">Installa LUMEN</button></div></div>';
+    +'<div class="card"><h2>Notifiche</h2><div class="pref-status" data-status="'+esc(push.status)+'"><strong>'+t(push.title)+'</strong><p>'+t(push.detail)+'</p></div>'
+    +(push.action?btn(push.action==='enable-push'?'Attiva su questo dispositivo':'Disattiva su questo dispositivo',push.action,'','alt'):'')
+    +'<p class="fine">Gli avvisi restano nella <a data-nav href="/notifiche"><u>casella comunicazioni</u></a>, indipendentemente dai permessi del browser.</p>'
+    +'<hr class="divider"><h3>Installa LUMEN</h3><p class="muted">'+t(installModel().detail)+'</p><a class="btn alt small" data-nav href="/installazione">Istruzioni di installazione →</a></div></div>';
 }
 
 async function kohaCatalog(){
@@ -235,6 +280,7 @@ async function kohaReturnsDesk(){
 async function view(){
   const path=location.pathname;
   if(path==='/')return home();
+  if(path==='/installazione')return installPage();
   if(path==='/catalogo')return catalog();
   if(path==='/koha'&&state.koha)return kohaCatalog();
   if(path==='/koha/me'&&state.kohaWrite)return kohaMyHolds();
@@ -257,11 +303,11 @@ async function render(){
   root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1"><div class="empty">Caricamento…</div></main>'+footer();
   try{
     const markup=await view();
-    root.innerHTML=header()+'<main id="main" class="shell">'+markup+'</main>'+footer();
-    const install=document.querySelector('#install');if(install&&state.install)install.style.display='';
+    root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1">'+markup+'</main>'+footer();
+    // Install buttons are state-derived, never shown when Chrome has no prompt.
     document.title='LUMEN · '+(location.pathname==='/'?'La tua biblioteca':location.pathname.split('/')[1]);
   }catch(e){
-    root.innerHTML=header()+'<main id="main" class="shell">'+sectionTitle('Servizio temporaneamente non disponibile',e.message)+'<a data-nav class="btn" href="/">Torna alla home</a></main>'+footer();
+    root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1">'+sectionTitle('Servizio temporaneamente non disponibile',e.message)+'<a data-nav class="btn" href="/">Torna alla home</a></main>'+footer();
   }
 }
 document.addEventListener('click',async event=>{
@@ -272,16 +318,34 @@ document.addEventListener('click',async event=>{
   const action=b.dataset.click,id=b.dataset.id;
   b.disabled=true;
   try{
-    if(action==='logout'){await api('/api/logout','POST');state.user=null;state.csrf=null;navigate('/');message('Sessione terminata');return;}
+    if(action==='logout'){
+      await disablePush(true);
+      await api('/api/logout','POST');state.user=null;state.csrf=null;
+      navigate('/');message('Sessione terminata');return;
+    }
+    if(['cancel-hold','return','disable'].includes(action)){
+      if(!await confirmation(action,b)){b.disabled=false;return;}
+    }
     if(action==='cancel-hold')await api('/api/holds/'+encodeURIComponent(id)+'/cancel','POST');
     if(action==='renew')await api('/api/loans/'+encodeURIComponent(id)+'/renew','POST');
     if(action==='return')await api('/api/staff/return','POST',{loanId:id});
-    if(action==='disable'){if(!confirm('Disabilitare questo account e revocare le sessioni?')){b.disabled=false;return;}await api('/api/staff/users/'+encodeURIComponent(id)+'/disable','POST');}
+    if(action==='disable')await api('/api/staff/users/'+encodeURIComponent(id)+'/disable','POST');
     if(action==='issue-ready'){const [bookId,userId]=id.split('|');await api('/api/staff/checkout','POST',{bookId,userId});}
     if(['approve','reject','ordered'].includes(action))await api('/api/suggestions/'+encodeURIComponent(id)+'/review','POST',{status:{approve:'approved',reject:'rejected',ordered:'ordered'}[action]});
     if(action==='read')await api('/api/notifications/'+encodeURIComponent(id)+'/read','POST');
-    if(action==='install'&&state.install){await state.install.prompt();state.install=null;}
-    if(action==='enable-push')await enablePush();
+    if(action==='install'){
+      if(state.install){
+        const prompt=state.install;state.install=null;
+        await prompt.prompt();
+        const result=await prompt.userChoice;
+        if(result?.outcome==='accepted')message('Installazione richiesta al browser');
+        else message('Installazione annullata. Puoi usare il menu del browser.');
+        await render();return;
+      }
+      navigate('/installazione');return;
+    }
+    if(action==='enable-push'){await enablePush();message('Notifiche attive su questo dispositivo');await render();return;}
+    if(action==='disable-push'){await disablePush();message('Notifiche disattivate su questo dispositivo');await render();return;}
     message('Operazione completata');await render();
   }catch(e){message(e.message,true);b.disabled=false;}
 });
@@ -351,19 +415,34 @@ document.addEventListener('submit',async event=>{
   }catch(e){message(e.message,true);if(submit)submit.disabled=false;}
 });
 async function enablePush(){
-  if(!('serviceWorker' in navigator)||!('PushManager' in window))throw new Error('Notifiche push non supportate su questo browser.');
+  if(!window.isSecureContext||!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))
+    throw new Error('Apri LUMEN in Chrome su HTTPS per abilitare le notifiche.');
+  // The permission request MUST be made from the actual click gesture before
+  // asynchronous network work, especially on mobile Chrome.
+  const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
+  if(permission!=='granted')throw new Error('Permesso negato. Puoi cambiarlo nelle impostazioni del sito.');
   const config=await api('/api/push-config');
-  if(!config.enabled)throw new Error('Push non configurata sul server.');
-  const permission=await Notification.requestPermission();
-  if(permission!=='granted')throw new Error('Permesso per le notifiche non concesso.');
+  if(!config.enabled)throw new Error('La biblioteca non ha ancora configurato gli avvisi di sistema.');
   const reg=await navigator.serviceWorker.ready;
   const base64=config.publicKey.replace(/-/g,'+').replace(/_/g,'/');
   const raw=atob(base64.padEnd(Math.ceil(base64.length/4)*4,'='));
   const key=Uint8Array.from(raw,c=>c.charCodeAt(0));
-  const subscription=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
+  const current=await reg.pushManager.getSubscription();
+  const subscription=current||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
   await api('/api/push-subscription','POST',subscription.toJSON());
 }
+async function disablePush(quiet=false){
+  if(!('serviceWorker' in navigator)||!('PushManager' in window))return;
+  const reg=await navigator.serviceWorker.ready;
+  const subscription=await reg.pushManager.getSubscription();
+  if(!subscription)return;
+  // Revoke user-to-device delivery on the server BEFORE browser unsubscribe.
+  await api('/api/push-subscription','DELETE',{endpoint:subscription.endpoint});
+  const unsubscribed=await subscription.unsubscribe();
+  if(!unsubscribed && !quiet)throw new Error('Impossibile disattivare la sottoscrizione sul dispositivo.');
+}
 window.addEventListener('popstate',render);
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.install=e;const button=document.querySelector('#install');if(button)button.style.display='';});
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.install=e;if(location.pathname==='/installazione')render();});
+window.addEventListener('appinstalled',()=>{state.install=null;if(location.pathname==='/installazione')render();message('LUMEN installata sul dispositivo');});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
 (async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;state.kohaLoans=!!c.koha?.loansEnabled;state.kohaReturns=!!c.koha?.returnsEnabled;state.oidcEnabled=!!c.identity?.oidcEnabled;state.oidcOnly=!!c.identity?.oidcOnly;}catch(e){message(e.message,true);}await render();})();
