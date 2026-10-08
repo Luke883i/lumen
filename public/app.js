@@ -92,7 +92,8 @@ function navigationContext(){
     koha:state.koha,kohaWrite:state.kohaWrite,kohaLoans:state.kohaLoans};
 }
 function taskHub(title='Azioni utili'){
-  const items=taskLinks(navigationContext());
+  const all=taskLinks(navigationContext());
+  const items=title==='Servizi collegati'?all.filter(item=>item.path.startsWith('/koha')):all;
   return '<section class="section task-hub" aria-label="'+t(title)+'"><div class="section-head"><h2>'+t(title)+'</h2></div>'
     +'<div class="task-list">'+items.map(item=>'<a class="task-link" data-nav href="'+esc(item.path)+'"><span><strong>'+t(item.label)+'</strong><small>'+t(item.detail)+'</small></span><span aria-hidden="true">→</span></a>').join('')+'</div></section>';
 }
@@ -164,13 +165,20 @@ async function notifications(){
 }
 async function staff(){
   if(!isStaff())return forbidden();
-  const [data,users,books,suggestions]=await Promise.all([api('/api/staff/stats'),api('/api/staff/users'),api('/api/books'),api('/api/suggestions')]);
+  const area=staffAreaFromSearch(location.search);
+  // Every work area fetches only the authoritative inputs it actually renders.
+  // Server RBAC is still mandatory for each endpoint and action.
+  const [data,users,books,suggestions]=await Promise.all([
+    ['panoramica','circolazione'].includes(area)?api('/api/staff/stats'):Promise.resolve(null),
+    ['circolazione','persone','integrazioni'].includes(area)?api('/api/staff/users'):Promise.resolve([]),
+    area==='circolazione'?api('/api/books'):Promise.resolve([]),
+    area==='acquisti'?api('/api/suggestions'):Promise.resolve([])
+  ]);
   const options=arr=>arr.map(x=>'<option value="'+esc(x.id)+'">'+t(x.name||x.title)+' ('+t(x.email||x.author)+')</option>').join('');
   const oidcMapping=state.oidcEnabled?'<section class="section card"><h2>Collega identità istituzionale</h2><p class="fine">Inserisci il subject OIDC ufficialmente verificato dall’amministratore IdP. Non usare l’indirizzo email come subject. La modifica di una associazione esistente è bloccata.</p><form class="form" data-form="oidc-bind"><label>Account LUMEN<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label>'+field('OIDC subject (sub)','subject','ID stabile IdP',true)+'<button class="btn small" type="submit">Associa subject</button></form></section>':'';
   const kohaMapping=state.kohaWrite?'<section class="section card"><h2>Collega un account Koha</h2><p class="muted">L’email dell’account deve corrispondere a quella restituita da Koha. Nessun collegamento automatico.</p><form class="form" data-form="koha-bind"><label>Account LUMEN<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label>'+field('Identificativo patron Koha','patronId','ID numerico',true,'number')+'<button type="submit" class="btn">Verifica e collega patron</button></form><p><a data-nav href="/staff/koha-pending">Verifica operazioni Koha in sospeso →</a></p></section>':'';
   const kohaReturnDesk=state.kohaReturns?'<section class="section card"><h2>Restituzioni Koha</h2><p class="fine">La restituzione si registra nella postazione Koha, non in LUMEN. Qui puoi preparare e verificare il rientro.</p><a class="btn alt small" data-nav href="/staff/koha-returns">Apri verifiche dei rientri →</a></section>':'';
   const kohaLoanDesk=state.kohaLoans?'<section class="section card"><h2>Banco prestiti Koha</h2><p class="muted">Consegna copia soltanto dopo verifica fisica dell’articolo. Nessuna forzatura delle regole di circolazione Koha.</p><form class="form" data-form="koha-checkout"><label>Patron associato a Koha<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label>'+field('ID copia Koha (item_id)','itemId','Identificativo numerico',true,'number')+'<button class="btn" type="submit">Consegna via Koha</button></form><p><a data-nav href="/staff/koha-loans-pending">Riconcilia prestiti e rinnovi incerti →</a></p></section>':'';
-  const area=staffAreaFromSearch(location.search);
   const info=STAFF_AREAS.find(x=>x.id===area);
   const workspaces='<nav class="staff-workspaces" aria-label="Attività del banco">'
     +STAFF_AREAS.map(item=>'<a data-nav href="/staff'+(item.id==='panoramica'?'':'?area='+item.id)+'" '
