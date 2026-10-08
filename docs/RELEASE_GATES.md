@@ -81,3 +81,7 @@ Live institutional IdP interoperability, signature verification using REAL IdP J
 ## R7 — Reproducible Codespaces and Render pilot deployment contract
 
 The canonical boot is `npm run dev` in a fresh Node 24 Codespace, with postCreate `npm ci`. The Render Blueprint pins Node 24.21.0, build `npm ci && npm run check && npm test`, persistent /var/data, prestart production preflight, health probe, and secure first administrator. `npm run verify:boot` exercises the real npm commands on isolated DBs; `npm run verify:deploy` statically checks the Blueprint. A live Render instance, restart persistence, Koha/IdP, offsite backups, HA and 2,000 concurrent production requests remain blocked. See [BOOT_DEPLOY.md](BOOT_DEPLOY.md).
+
+### R7 canary enhancement
+
+Render `autoDeployTrigger: checksPass` waits for GitHub checks; a public `/api/version` endpoint exposes only service, environment mode and deployment Git SHA (from Render's documented `RENDER_GIT_COMMIT`). `EXPECTED_SHA=... npm run verify:remote -- https://...` refuses mismatched commits, missing DB health, or absent PWA. CI validates this script with an isolated server fixture; a real Render service remains unverified until the operator runs it.

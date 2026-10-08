@@ -19,11 +19,11 @@ For reproducibility, run `npm run verify:boot`: it starts actual `npm run dev` a
 
 ## Deploy on Render — standalone pilot
 
-Connect `main` in **Render → New → Blueprint**, selecting this repository's `render.yaml`. Enter a non-demo `ADMIN_EMAIL` and a strong `ADMIN_PASSWORD` (12+ characters) when prompted. Render provisions a paid **Starter** Node.js web service with a 1 GB persistent disk at `/var/data`. It builds with `npm ci && npm run check && npm test`, then runs `npm start` (which now invokes the production preflight automatically).
+Connect `main` in **Render → New → Blueprint**, selecting this repository's `render.yaml`. Enter a non-demo `ADMIN_EMAIL` and a strong `ADMIN_PASSWORD` (12+ characters) when prompted. Render provisions a paid **Starter** Node.js web service with a 1 GB persistent disk at `/var/data`. It builds with `npm ci && npm run check && npm test`, then runs `npm start` (which now invokes the production preflight automatically). Only commits whose GitHub checks pass are auto-deployed.
 
-After Render shows **Live**, open `https://<your-service>.onrender.com/api/health`, confirm `status: ok` and `db: true`, then use the administrator credentials to sign in and create real users/books. No demonstration dataset is seeded. Push notifications, live Koha and institutional OIDC are optional, separately configured features; enable none until each acceptance gate is met.
+After Render shows **Live**, confirm the exact deployed revision with `EXPECTED_SHA=$(git rev-parse HEAD) npm run verify:remote -- https://your-service.onrender.com` (from a matching checkout), then open `https://<your-service>.onrender.com/api/health`, confirm `status: ok` and `db: true`, then use the administrator credentials to sign in and create real users/books. No demonstration dataset is seeded. Push notifications, live Koha and institutional OIDC are optional, separately configured features; enable none until each acceptance gate is met.
 
-**This is a single-instance SQLite pilot, not a high-availability ILS deployment or a 2,000-concurrent-user certification.** Disks cannot be shared by Render replicas and cause a short deployment interruption. Follow the exact environment and rollback procedure in [BOOT_DEPLOY.md](docs/BOOT_DEPLOY.md). <escape></escape>
+**This is a single-instance SQLite pilot, not a high-availability ILS deployment or a 2,000-concurrent-user certification.** Disks cannot be shared by Render replicas and cause a short deployment interruption. Follow the exact environment and rollback procedure in [BOOT_DEPLOY.md](docs/BOOT_DEPLOY.md).
 
 ## Koha catalogue and opt-in circulation bridge
 

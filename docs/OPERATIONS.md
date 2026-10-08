@@ -40,3 +40,7 @@ Both integrations are disabled unless explicitly configured. Koha loans and chec
 ## Current architecture boundary
 
 A Render persistent disk cannot be mounted on multiple instances and prevents zero-downtime deploys. This standalone topology must not be represented as production-ready enterprise capacity for 2,000 concurrent users; that gate requires an infrastructure and data-plane re-evaluation, realistic benchmark, DR/security and institutional signoff.
+
+## After-deploy read-only canary
+
+Run `EXPECTED_SHA=$(git rev-parse HEAD) npm run verify:remote -- https://your-service.onrender.com` from the revision deployed to Render. Requires a real Render HTTPS service; it checks `/api/health`, `/api/version`, PWA manifest and landing page, with strict SHA match.
