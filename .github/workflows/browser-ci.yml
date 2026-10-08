@@ -1,0 +1,48 @@
+name: R9 Browser Acceptance
+on:
+  push:
+    branches: [main, feat/lumen-r9-browser-e2e]
+    paths:
+      - 'browser/**'
+      - 'public/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/browser-ci.yml'
+  pull_request:
+    paths:
+      - 'browser/**'
+      - 'public/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/browser-ci.yml'
+permissions:
+  contents: read
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install LUMEN exactly
+        run: npm ci
+      - name: Install isolated browser test dependencies
+        run: npm --prefix browser ci
+      - name: Install pinned Chromium and Linux libraries
+        run: npm --prefix browser exec -- playwright install --with-deps chromium
+      - name: Actual desktop and Android-emulated browser journeys
+        run: npm run test:browser
+      - name: Save failing browser trace and screenshot evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumen-r9-browser-failure
+          path: |
+            browser/test-results/
+            browser/playwright-report/
+          retention-days: 7
