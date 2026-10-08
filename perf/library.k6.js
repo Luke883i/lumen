@@ -21,12 +21,12 @@ export default function(){
   const step=__ITER%4;
   const path=step===0?'/api/me':step===1?'/api/books?q=Title%2012':step===2?'/api/holds':'/api/books?q=Author%201';
   const response=http.get(host+path,{headers,tags:{name:path.split('?')[0]}});
-  const ok=check(response,{'HTTP 200':r=>r.status===200,'JSON payload':r=>r.headers['Content-Type']?.includes('application/json')});
+  const ok=check(response,{'HTTP 200':r=>r.status===200,'JSON payload':r=>(r.headers['Content-Type']||'').indexOf('application/json')>=0});
   errors.add(!ok);
   if(path.startsWith('/api/books'))searchLatency.add(response.timings.duration);
   sleep(2+Math.random()*2);
 }
 export function handleSummary(data){
   const json=JSON.stringify({sha:__ENV.GIT_SHA||'unknown',workload:{users:maxUsers,books:Number(__ENV.LOAD_BOOKS||20000),hold_seconds:holdSeconds,run:'synthetic-GitHub-runner'},metrics:data.metrics,thresholds:options.thresholds},null,2);
-  return {'perf/evidence.json':json,stdout:JSON.stringify({vus:maxUsers,checks:data.metrics?.checks,failed:data.metrics?.http_req_failed,duration:data.metrics?.http_req_duration},null,2)};
+  return {'perf/evidence.json':json,stdout:JSON.stringify({vus:maxUsers,checks:data.metrics && data.metrics.checks,failed:data.metrics && data.metrics.http_req_failed,duration:data.metrics && data.metrics.http_req_duration},null,2)};
 }
