@@ -17,3 +17,9 @@ Back up database; deploy commit SHA; startup migrates with `CREATE TABLE IF NOT 
 
 ## Limits
 No external ILS, no SSO, no MARC, no email. For 2,000 concurrent users: measure before sizing, and migrate to multi-instance/Postgres if the single-writer design saturates.
+
+## Consistent SQLite backup (R2)
+
+Run `npm run backup -- /var/data/backups/lumen-YYYYMMDD.sqlite` from the service shell, with `LUMEN_DB_PATH` set. Uses Node's SQLite online backup API (WAL-consistent), opens the resulting image, runs PRAGMA integrity_check and writes a SHA-256 manifest next to the snapshot. **The backup must then be exported to separate storage with access control and tested restores**; a backup stored on the same disk is insufficient disaster recovery. Backup frequency, offsite copy and restore drills are currently operator obligations, not implemented automation.
+
+Node 24's built-in SQLite API is at Release Candidate stability; do not claim enterprise DB maturity until verified for the chosen release.
