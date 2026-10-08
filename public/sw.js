@@ -32,7 +32,7 @@ const safeTarget=value=>{
 };
 self.addEventListener('push',event=>{
   let payload={};
-  try{payload=event.data?.json()||{};}catch{}
+  try{const parsed=event.data?.json();payload=parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};}catch{}
   // Keep private loan/identity details off the device's lock screen.
   const title=payload.kind==='hold_ready'?'LUMEN · Prenotazioni':'LUMEN · Biblioteca';
   const data={url:safeTarget(payload.url)};
