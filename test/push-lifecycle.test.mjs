@@ -194,7 +194,7 @@ test('R9b Web Push key syntax enforces valid P-256 and 16-byte auth before persi
     {p256dh:'A'.repeat(87),auth:keys.auth}, // correct length but not a valid curve point
     {p256dh:keys.p256dh,auth:'B'.repeat(16)}, // decodes to only 12 octets
     {p256dh:keys.p256dh,auth:keys.auth+'!'},
-    {p256dh:keys.p256dh+'=',auth:keys.auth} // impossible padding for 65 bytes
+    {p256dh:keys.p256dh+'===',auth:keys.auth} // padding exceeds Base64url allowance
   ];
   for(const k of invalid){
     assert.equal(validPushKeys(k),false);
