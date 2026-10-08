@@ -11,13 +11,14 @@ function setup(overrides={}){
  const librarian=s.get("SELECT * FROM users WHERE role='librarian'");
  const student=s.get("SELECT * FROM users WHERE role='student'");
  const faculty=s.get("SELECT * FROM users WHERE role='faculty'");
- const calls={code:0,nonce:null,signatureChecks:0},state={subject:'subject-123',email:student.email,verified:true,role:'librarian'};
+ const calls={code:0,nonce:null,signatureChecks:0,clientAuth:null,authMethod:null},state={subject:'subject-123',email:student.email,verified:true,role:'librarian'};
  const library={
   randomPKCECodeVerifier:()=> 'unique-verifier-code',
   randomNonce:()=> 'fixture-nonce',
   calculatePKCECodeChallenge:async verifier=>'challenge:'+verifier,
   randomState:()=> 'fixture-state',
-  async discovery(){return {serverMetadata:()=>({issuer:environment.OIDC_ISSUER})};},
+  async discovery(server,clientId,secret,auth){calls.authMethod=auth;return {serverMetadata:()=>({issuer:environment.OIDC_ISSUER})};},
+  ClientSecretBasic(secret){calls.clientAuth=secret;return {type:'basic',secret};},
   enableNonRepudiationChecks(){calls.signatureChecks++;},
   buildAuthorizationUrl(config,params){
     const url=new URL('https://idp.example.edu/authorize');
@@ -44,6 +45,8 @@ test('OIDC config is strictly opt-in, issuer HTTPS and callback explicit',()=>{
  assert.throws(()=>oidcConfiguration({...environment,OIDC_ISSUER:'http://idp.example.edu'}),/OIDC_CONFIGURATION/);
  assert.throws(()=>oidcConfiguration({...environment,NODE_ENV:'production'}),/OIDC_CONFIGURATION/);
  assert.equal(oidcConfiguration(environment).enabled,true);
+ assert.throws(()=>oidcConfiguration({...environment,OIDC_TOKEN_AUTH_METHOD:'none'}),/OIDC_CONFIGURATION/);
+ assert.throws(()=>oidcConfiguration({...environment,OIDC_ONLY:'true'}),/OIDC_CONFIGURATION/);
 });
 test('OIDC uses one-time state, PKCE, nonce and explicit database binding',async()=>{
  const f=setup(),service=createService(f.s);
@@ -135,5 +138,13 @@ test('production SSO-only runtime refuses to start before an active librarian is
  assert.equal(createOidc(f.s,secure,f.library).only,true);
  f.s.run('UPDATE users SET active=0 WHERE id=?',f.librarian.id);
  assert.throws(()=>createOidc(f.s,secure,f.library),/OIDC_PRODUCTION_LOCKOUT/);
+ f.s.close();
+});
+
+test('institutional IdP can require client_secret_basic without replacing OIDC logic',async()=>{
+ const f=setup({OIDC_TOKEN_AUTH_METHOD:'client_secret_basic'});
+ await f.oidc.start();
+ assert.equal(f.calls.clientAuth,environment.OIDC_CLIENT_SECRET);
+ assert.equal(f.calls.authMethod.type,'basic');
  f.s.close();
 });

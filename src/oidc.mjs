@@ -9,10 +9,15 @@ const random=()=>randomBytes(32).toString('base64url');
 const digest=t=>createHash('sha256').update(t).digest('hex');
 const isSubject=s=>typeof s==='string'&&s.length>0&&s.length<=255&&!/[\u0000-\u001f]/.test(s);
 export function oidcConfiguration(env=process.env){
+  const method=env.OIDC_TOKEN_AUTH_METHOD||'client_secret_post';
+  if(!['client_secret_post','client_secret_basic'].includes(method)||
+    (env.OIDC_ONLY!==undefined && !['0','1'].includes(env.OIDC_ONLY)))
+    throw Error('OIDC_CONFIGURATION: unsupported token auth or OIDC_ONLY value');
   const keys=['OIDC_ISSUER','OIDC_CLIENT_ID','OIDC_CLIENT_SECRET','OIDC_REDIRECT_URI'];
   const values=keys.filter(k=>!!env[k]);
   if(!values.length){
-    if(env.OIDC_ONLY==='1')throw Error('OIDC_CONFIGURATION: OIDC_ONLY requires a configured provider');
+    if(env.OIDC_ONLY==='1'||env.OIDC_TOKEN_AUTH_METHOD)
+      throw Error('OIDC_CONFIGURATION: OIDC options require a configured provider');
     return {enabled:false};
   }
   if(values.length!==keys.length)throw Error('OIDC_CONFIGURATION: issuer, client id/secret and redirect URI are required together');
@@ -22,7 +27,7 @@ export function oidcConfiguration(env=process.env){
       (redirect.protocol!=='https:'&&!loopback)||redirect.username||redirect.password||redirect.search||redirect.hash||
       redirect.pathname!=='/api/auth/oidc/callback')throw Error('OIDC_CONFIGURATION: invalid HTTPS issuer or callback');
   return {enabled:true,issuer:issuer.href,clientId:env.OIDC_CLIENT_ID,
-    clientSecret:env.OIDC_CLIENT_SECRET,redirectUri:redirect.href,oidcOnly:env.OIDC_ONLY==='1'};
+    clientSecret:env.OIDC_CLIENT_SECRET,redirectUri:redirect.href,oidcOnly:env.OIDC_ONLY==='1',tokenAuth:method};
 }
 export function createOidc(s,env=process.env,provider=null){
   const settings=oidcConfiguration(env);
@@ -43,7 +48,9 @@ export function createOidc(s,env=process.env,provider=null){
     if(loading)return loading;
     loading=(async()=>{
       const lib=await implementation();
-      const config=await lib.discovery(new URL(settings.issuer),settings.clientId,settings.clientSecret);
+      const auth=settings.tokenAuth==='client_secret_basic'
+        ?lib.ClientSecretBasic(settings.clientSecret):undefined;
+      const config=await lib.discovery(new URL(settings.issuer),settings.clientId,settings.clientSecret,auth);
       // TLS validates the token endpoint; enable JWS signature validation too for
       // explicit issuer-key proof and defense against token endpoint compromise.
       lib.enableNonRepudiationChecks(config);

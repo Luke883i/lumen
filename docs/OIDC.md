@@ -31,3 +31,7 @@ With institutional OIDC environment credentials configured and the exact registe
 ## Bounded authentication state
 
 R6 stores only short-lived PKCE verifier, nonce and hashes of browser state/flow. `oidc_flows.expires_at` has an index. A maximum of 20,000 simultaneous pending flows (configurable with `OIDC_FLOW_LIMIT` 1..50000 for tests and capacity planning) fails closed with HTTP 429 rather than consuming unbounded SQLite storage. This does **not** replace edge DDoS protection, IdP login throttling or a 2,000-user production-equivalent load test.
+
+## Institutional token client authentication
+
+Most providers accept `client_secret_post` (default). If your institutional IdP requires HTTP Basic authentication at the token endpoint, set `OIDC_TOKEN_AUTH_METHOD=client_secret_basic`. The allowlist rejects any other method and the same setting is exercised by `npm run oidc:smoke`; no support for public clients or unauthenticated tokens is claimed.
