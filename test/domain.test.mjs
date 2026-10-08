@@ -181,3 +181,12 @@ test('FTS catalogue index supports multi-term prefix and accent-insensitive sear
   assert.ok(queryPlan.detail.includes('VIRTUAL TABLE INDEX'));
   s.close();
 });
+
+test('catalogue availability has covering indexes on every dependent join',()=>{
+  const {s}=fixture();
+  const ix=new Set(s.all("SELECT name FROM sqlite_master WHERE type='index'").map(x=>x.name));
+  for (const x of ['idx_copies_book','idx_loans_active_copy','idx_holds_by_book_status']) assert.ok(ix.has(x),'missing '+x);
+  const plan=s.get('EXPLAIN QUERY PLAN SELECT count(*) FROM copies WHERE book_id=?','sample-book');
+  assert.match(plan.detail,/idx_copies_book/);
+  s.close();
+});
