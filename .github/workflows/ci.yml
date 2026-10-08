@@ -8,7 +8,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,29 +22,7 @@ jobs:
         run: |
           set -o pipefail
           npm test 2>&1 | tee /tmp/lumen-test.log
-      - name: Publish failing OIDC tests on PR 6
-        if: failure() && github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          { echo '### R6 OIDC test diagnostics · ${{ github.sha }}'; echo '~~~text'; tail -n 140 /tmp/lumen-test.log; echo '~~~'; } > /tmp/lumen-test-report.md
-          gh pr comment 6 --body-file /tmp/lumen-test-report.md
-      - name: Start command and health probe
-        env:
-          NODE_ENV: test
-          LUMEN_DEMO: '1'
-          LUMEN_DB_PATH: ./data/ci-smoke.sqlite
-          PORT: '3000'
-        run: |
-          node src/server.mjs > /tmp/lumen-start.log 2>&1 &
-          PID=$!
-          trap 'kill "$PID" || true' EXIT
-          for i in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:3000/api/health | grep -q '"status":"ok"'; then break; fi
-            sleep 1
-          done
-          curl -fsS http://127.0.0.1:3000/ | grep -q 'LUMEN'
-          curl -fsS http://127.0.0.1:3000/api/config | grep -q '"configured":false'
-      - name: Surface smoke diagnostic
-        if: failure()
-        run: cat /tmp/lumen-start.log 2>/dev/null || true
+      - name: Render release contract
+        run: npm run verify:deploy
+      - name: Clean Codespaces and npm start runtime journeys
+        run: npm run verify:boot
