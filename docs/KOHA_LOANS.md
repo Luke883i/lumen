@@ -33,3 +33,16 @@ Enterprise OIDC: UNVERIFIED. Render target 2,000 concurrent mixed load soak: UNV
 High availability and offsite recovery: UNVERIFIED. Privacy/security/accessibility audit: UNVERIFIED.
 
 No enterprise production readiness claim is supported by green mock CI alone.
+
+## Live Koha R4 read-only verification
+
+Before enabling KOHA_LOANS_ENABLED for a real library, configure scoped OAuth2 secrets and known test fixtures through environment variables:
+
+```bash
+export KOHA_TEST_PATRON_ID=101
+export KOHA_TEST_CHECKOUT_ID=501
+export KOHA_TEST_ITEM_ID=81
+GIT_SHA=$(git rev-parse HEAD) npm run koha:loans-smoke
+```
+
+This probe performs GET requests only: patron loans, checkout ownership, renewal policy and checkout availability. It does not issue or renew an item. The IDs above are placeholders; supply real fixture IDs. No live Koha credentials were available in the repository CI, so this gate remains unverified.

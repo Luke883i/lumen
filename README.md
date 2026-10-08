@@ -48,7 +48,7 @@ All R4 routes require BOTH KOHA_CIRCULATION_ENABLED=1 AND KOHA_LOANS_ENABLED=1, 
 Without both flags the existing R2/R3 runtime behaviour is unchanged.
 Koha is the only source of loan truth; local SQLite stores attempt receipts, not Koha loans.
 Koha warnings, blockers and confirmation requirements stop automated issuance: no override tokens are sent.
-See [R4 loan contracts](docs/KOHA_LOANS.md).
+See [R4 loan contracts, verification and DoD](docs/KOHA_LOANS.md).
 
 DO NOT enable R4 on public production without testing your real Koha instance and operator permissions.
 Returns/check-ins, institutional SSO and enterprise scale/recovery certification remain unfinished.
