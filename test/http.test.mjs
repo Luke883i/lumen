@@ -54,3 +54,22 @@ test('HTTP auth, same-origin, CSRF, and patron authorisation',async()=>{
   const blocked=await fetch(host+'/api/holds',{headers:{Cookie:cookie}});
   assert.equal(blocked.status,401);
 });
+
+test('staff mutation audit is permission-scoped and omits raw data',async()=>{
+  const login=async email=>{
+    const r=await fetch(host+'/api/login',{method:'POST',headers:{'Content-Type':'application/json',Origin:host},
+      body:JSON.stringify({email,password:'Demo1234!'})});
+    assert.equal(r.status,200);return {body:await r.json(),cookie:r.headers.get('set-cookie').split(';')[0]};
+  };
+  const student=await login('student@lumen.local');
+  const forbidden=await fetch(host+'/api/staff/audit',{headers:{Cookie:student.cookie}});
+  assert.equal(forbidden.status,403);
+  const staff=await login('librarian@lumen.local');
+  const result=await fetch(host+'/api/staff/audit?limit=10',{headers:{Cookie:staff.cookie}});
+  assert.equal(result.status,200);
+  const entries=await result.json();
+  assert.ok(Array.isArray(entries));
+  assert.ok(entries.length>=1);
+  assert.ok(entries.some(x=>x.operation==='hold'));
+  assert.ok(entries.every(x=>!('payload' in x)&&!('password' in x)));
+});

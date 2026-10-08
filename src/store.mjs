@@ -105,7 +105,8 @@ function addAccount(s, { email, name, role, password }) {
 
 export function bootstrap(s, env = process.env) {
   // A demo DB must never be reused on an internet-facing production service.
-  const isDemo = s.get("SELECT value FROM metadata WHERE key='demo_dataset'")?.value === '1';
+  const isDemo = s.get("SELECT value FROM metadata WHERE key='demo_dataset'")?.value === '1' ||
+    !!s.get("SELECT 1 FROM users WHERE email IN ('student@lumen.local','faculty@lumen.local','librarian@lumen.local') LIMIT 1");
   if (env.NODE_ENV === 'production' && (isDemo || env.LUMEN_DEMO === '1')) {
     throw new Error('REFUSING PRODUCTION START: demonstration dataset or LUMEN_DEMO enabled');
   }
