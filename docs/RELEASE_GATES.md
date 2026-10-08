@@ -58,3 +58,13 @@ L6: all saturation evidence binds to a Git SHA, dataset, measured thresholds and
 ## R3 draft (commit-scoped; NOT part of R2 evidence)
 
 Koha-authoritative patron holds are implemented behind `KOHA_CIRCULATION_ENABLED=1` with manual verified mapping, server-enforced user scoping, durable request receipts, failure states and staff positive reconciliation. Test support includes Koha transport mocks, domain mutations and HTTP end-to-end. No controlled live Koha has been connected; K2 and K4-K5 remain BLOCKED. R3 must not be called enterprise production-ready, even with green CI.
+
+## R4 candidate status (separate draft PR #4)
+
+- R4 adds Koha-authoritative patron loan listing, staff checkout and patron renewal behind KOHA_LOANS_ENABLED=1.
+- The Koha REST adapter, local receipt journaling and reconciliation are implemented and tested with simulated Koha responses; no live write verification is claimed.
+- A non-mutating live checkout/renew policy probe exists as `npm run koha:loans-smoke`.
+- Checkout/check-in full lifecycle remains incomplete because Koha return endpoint and institutional policies need verification.
+- Enterprise gating for SSO, 2000 sessions on actual Koha/Render, off-site RPO/RTO, security and accessibility remains open.
+
+R4 must not be marketed as enterprise ILS production ready even after normal review and merge.

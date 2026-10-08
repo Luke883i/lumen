@@ -41,6 +41,18 @@ The independent Koha catalogue remains available in read-only mode by default. R
 
 See [circulation contract and limitations](docs/KOHA_CIRCULATION.md). This is a **controlled integration slice**, not a tested live production Koha deployment. Koha checkout/check-in/renew, institutional SSO, 2,000-production-concurrency, and enterprise certification remain open gates.
 
+## R4 controlled Koha loan pilot
+
+R4 adds Koha-authoritative patron loan listing and renewal, staff checkout issuance, and staff positive reconciliation.
+All R4 routes require BOTH KOHA_CIRCULATION_ENABLED=1 AND KOHA_LOANS_ENABLED=1, plus KOHA_PICKUP_LIBRARY_ID.
+Without both flags the existing R2/R3 runtime behaviour is unchanged.
+Koha is the only source of loan truth; local SQLite stores attempt receipts, not Koha loans.
+Koha warnings, blockers and confirmation requirements stop automated issuance: no override tokens are sent.
+See [R4 loan contracts, verification and DoD](docs/KOHA_LOANS.md).
+
+DO NOT enable R4 on public production without testing your real Koha instance and operator permissions.
+Returns/check-ins, institutional SSO and enterprise scale/recovery certification remain unfinished.
+
 ## Non-negotiable architectural boundaries
 
 - **Standalone mode**: self-contained lightweight single-library circulation, not a full ILS. It does **not** claim MARC cataloguing, federated OPAC, inter-library lending, fines, serials or Koha parity.

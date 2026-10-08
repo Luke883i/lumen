@@ -25,6 +25,13 @@ if(process.env.KOHA_CIRCULATION_ENABLED==='1'){
     /^[A-Za-z0-9_-]{1,20}$/.test(process.env.KOHA_PICKUP_LIBRARY_ID||'')),
     'Koha pilot circulation must have server-side URL, credentials and pickup library');
 }
+if(process.env.KOHA_LOANS_ENABLED==='1'){
+  record('koha-loan-feature-dependency',
+    process.env.KOHA_CIRCULATION_ENABLED==='1' &&
+    !!(process.env.KOHA_BASE_URL&&process.env.KOHA_CLIENT_ID&&process.env.KOHA_CLIENT_SECRET) &&
+    /^[A-Za-z0-9_-]{1,20}$/.test(process.env.KOHA_PICKUP_LIBRARY_ID||''),
+    'Koha loans require circulation flag, scoped API credentials and library code');
+}
 const path=process.env.LUMEN_DB_PATH;
 if(path&&existsSync(path)){
   try{

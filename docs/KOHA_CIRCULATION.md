@@ -41,3 +41,7 @@ The librarian's `/staff/koha-pending` screen accepts an actual Koha hold ID. `PO
 ## Run live, safe verification (not performed automatically)
 
 Configure **secrets** `KOHA_BASE_URL`, `KOHA_CLIENT_ID`, `KOHA_CLIENT_SECRET` along with a known Koha test fixture: `KOHA_TEST_PATRON_ID`, `KOHA_TEST_PATRON_EMAIL` and optionally `KOHA_TEST_BIBLIO_ID`, then run `GIT_SHA=$(git rev-parse HEAD) npm run koha:smoke`. The command uses only GET endpoints and OAuth2 token grant, never places or cancels a hold. It exits nonzero on a failed check **or when the patron fixture is missing**, binding an evidence report to the SHA. Passing this cannot prove live write compatibility, cross-system identity lifecycle or enterprise readiness.
+
+## R4 loan extension
+
+See [KOHA_LOANS.md](KOHA_LOANS.md). The loans interface, issuance and renewal are behind a second feature flag. Koha returns/checkins remain outside this slice.
