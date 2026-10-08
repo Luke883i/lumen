@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { newId, now, hashPassword, verifyPassword, tokenHash } from './store.mjs';
 
 export class Failure extends Error {
@@ -41,6 +41,21 @@ export function createService(s) {
     if(!current||!current.active) fail(403,'ACCOUNT_DISABLED','Account disabilitato');
     if(current.role!==user.role||!roles.includes(current.role)) fail(403,'FORBIDDEN','Permesso insufficiente');
   }
+  function idempotent(user,key,operation,payload,fn) {
+    if(!key) return s.tx(fn);
+    if(typeof key!=='string'||!/^[a-zA-Z0-9_-]{12,100}$/.test(key)) fail(400,'IDEMPOTENCY_KEY_INVALID','Chiave idempotente non valida');
+    return s.tx(()=>{
+      const digest=createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+      const past=s.get('SELECT * FROM idempotency WHERE user_id=? AND key=?',user.id,key);
+      if(past) {
+        if(past.operation!==operation||past.payload_hash!==digest) fail(409,'IDEMPOTENCY_CONFLICT','Chiave già usata per operazione diversa');
+        return JSON.parse(past.result_json);
+      }
+      const result=fn();
+      s.run('INSERT INTO idempotency(user_id,key,operation,payload_hash,result_json,created_at) VALUES(?,?,?,?,?,?)',user.id,key,operation,digest,JSON.stringify(result),now());
+      return result;
+    });
+  }
   const api = {
     current(token) {
       if(!token) return null;
@@ -80,9 +95,9 @@ export function createService(s) {
       requireRole(user,['student','faculty','librarian']);
       return s.all("SELECT h.*,b.title,b.author FROM holds h JOIN books b ON b.id=h.book_id WHERE h.user_id=? ORDER BY h.created_at DESC",user.id);
     },
-    requestHold(user,bookId) {
+    requestHold(user,bookId,key=null) {
       requireRole(user,['student','faculty','librarian']);
-      return s.tx(()=>{
+      return idempotent(user,key,'hold',{bookId},()=>{
         if(!s.get('SELECT id FROM books WHERE id=?',bookId)) fail(404,'NOT_FOUND','Titolo inesistente');
         if(s.get("SELECT id FROM holds WHERE book_id=? AND user_id=? AND status IN ('queued','ready')",bookId,user.id)) fail(409,'DUPLICATE_HOLD','Prenotazione già attiva');
         if(s.get("SELECT l.id FROM loans l JOIN copies c ON c.id=l.copy_id WHERE c.book_id=? AND l.user_id=? AND l.status='active'",bookId,user.id)) fail(409,'ALREADY_BORROWED','Hai già un prestito attivo per questo titolo');
@@ -94,9 +109,9 @@ export function createService(s) {
         return result;
       });
     },
-    cancelHold(user,id) {
+    cancelHold(user,id,key=null) {
       requireRole(user,['student','faculty','librarian']);
-      return s.tx(()=>{
+      return idempotent(user,key,'cancel-hold',{id},()=>{
         const h=s.get('SELECT * FROM holds WHERE id=?',id);
         if(!h) fail(404,'NOT_FOUND','Prenotazione inesistente');
         if(user.role!=='librarian' && h.user_id!==user.id) fail(403,'FORBIDDEN','Prenotazione altrui');
@@ -110,9 +125,9 @@ export function createService(s) {
       requireRole(user,['student','faculty','librarian']);
       return s.all("SELECT l.*,b.id AS book_id,b.title,b.author,c.barcode FROM loans l JOIN copies c ON c.id=l.copy_id JOIN books b ON b.id=c.book_id WHERE l.user_id=? ORDER BY l.checked_out_at DESC",user.id);
     },
-    checkout(user,patronId,bookId) {
+    checkout(user,patronId,bookId,key=null) {
       requireRole(user,['librarian']);
-      return s.tx(()=>{
+      return idempotent(user,key,'checkout',{patronId,bookId},()=>{
         const patron=s.get('SELECT * FROM users WHERE id=?',patronId);
         if(!patron||!patron.active) fail(404,'PATRON_NOT_FOUND','Utente non attivo');
         if(!s.get('SELECT id FROM books WHERE id=?',bookId)) fail(404,'NOT_FOUND','Titolo inesistente');
@@ -127,9 +142,9 @@ export function createService(s) {
         return s.get('SELECT * FROM loans WHERE id=?',id);
       });
     },
-    returnLoan(user,id) {
+    returnLoan(user,id,key=null) {
       requireRole(user,['librarian']);
-      return s.tx(()=>{
+      return idempotent(user,key,'return',{id},()=>{
         const loan=s.get("SELECT l.*,c.book_id FROM loans l JOIN copies c ON c.id=l.copy_id WHERE l.id=?",id);
         if(!loan) fail(404,'NOT_FOUND','Prestito inesistente');
         if(loan.status!=='active') fail(409,'INVALID_STATE','Prestito gia restituito');
@@ -139,9 +154,9 @@ export function createService(s) {
         return {ok:true};
       });
     },
-    renew(user,id) {
+    renew(user,id,key=null) {
       requireRole(user,['student','faculty','librarian']);
-      return s.tx(()=>{
+      return idempotent(user,key,'renew',{id},()=>{
         const l=s.get("SELECT l.*,c.book_id FROM loans l JOIN copies c ON c.id=l.copy_id WHERE l.id=?",id);
         if(!l) fail(404,'NOT_FOUND','Prestito non trovato');
         if(user.role!=='librarian' && l.user_id!==user.id) fail(403,'FORBIDDEN','Prestito altrui');
@@ -153,11 +168,11 @@ export function createService(s) {
         return {due_at:due};
       });
     },
-    suggest(user,form) {
+    suggest(user,form,key=null) {
       requireRole(user,['faculty']);
       const title=needed(form.title,200), author=needed(form.author,160), reason=needed(form.reason,500);
       const isbn=str(form.isbn,32);
-      return s.tx(()=>{
+      return idempotent(user,key,'suggest',form,()=>{
         if(isbn && (s.get("SELECT id FROM books WHERE isbn=? LIMIT 1",isbn) || s.get("SELECT id FROM suggestions WHERE isbn=? AND user_id=? AND status IN ('pending','approved') LIMIT 1",isbn,user.id))) fail(409,'DUPLICATE_SUGGESTION','Titolo gia presente o proposta gia attiva');
         const id=newId();
         s.run("INSERT INTO suggestions(id,user_id,title,author,isbn,reason,status,created_at) VALUES(?,?,?,?,?,?,?,?)",id,user.id,title,author,isbn,reason,'pending',now());
@@ -170,10 +185,10 @@ export function createService(s) {
       if(user.role==='librarian') return s.all("SELECT sg.*,u.name requester FROM suggestions sg JOIN users u ON u.id=sg.user_id ORDER BY sg.created_at DESC");
       return s.all("SELECT * FROM suggestions WHERE user_id=? ORDER BY created_at DESC",user.id);
     },
-    reviewSuggestion(user,id,status) {
+    reviewSuggestion(user,id,status,key=null) {
       requireRole(user,['librarian']);
       if(!['approved','rejected','ordered'].includes(status)) fail(400,'INPUT_INVALID','Stato non valido');
-      return s.tx(()=>{
+      return idempotent(user,key,'review',{id,status},()=>{
         const sg=s.get('SELECT * FROM suggestions WHERE id=?',id);
         if(!sg) fail(404,'NOT_FOUND','Richiesta non trovata');
         if(!((sg.status==='pending'&&['approved','rejected'].includes(status))||(sg.status==='approved'&&status==='ordered'))) fail(409,'INVALID_STATE','Transizione non consentita');
@@ -195,6 +210,17 @@ export function createService(s) {
       s.run("INSERT INTO users(id,email,name,role,passhash,created_at) VALUES(?,?,?,?,?,?)",id,email,name,role,hashPassword(form.password),now());
       return {id};
     },
+    changePassword(user,oldPassword,newPassword) {
+      requireRole(user,['student','faculty','librarian']);
+      if(!minLength(newPassword,12)) fail(400,'INPUT_INVALID','La nuova password deve avere almeno 12 caratteri');
+      const row=s.get('SELECT passhash FROM users WHERE id=?',user.id);
+      if(!verifyPassword(oldPassword||'',row.passhash)) fail(403,'BAD_CREDENTIALS','Password attuale non valida');
+      s.tx(()=>{
+        s.run('UPDATE users SET passhash=? WHERE id=?',hashPassword(newPassword),user.id);
+        s.run('DELETE FROM sessions WHERE user_id=?',user.id);
+      });
+      return {ok:true,reauthenticate:true};
+    },
     disableUser(user,id) {
       requireRole(user,['librarian']);
       return s.tx(()=>{
@@ -208,12 +234,12 @@ export function createService(s) {
         return {ok:true};
       });
     },
-    addBook(user,form) {
+    addBook(user,form,key=null) {
       requireRole(user,['librarian']);
       const title=needed(form.title,200),author=needed(form.author,160),isbn=str(form.isbn,32),subject=str(form.subject,120),description=str(form.description,1200);
       const count=Number(form.copies);
       if(!Number.isInteger(count)||count<1||count>30) fail(400,'INPUT_INVALID','Copie: numero fra 1 e 30');
-      return s.tx(()=>{
+      return idempotent(user,key,'book',form,()=>{
         const id=newId();
         s.run("INSERT INTO books(id,title,author,isbn,subject,description,created_at) VALUES(?,?,?,?,?,?,?)",id,title,author,isbn,subject,description,now());
         for(let i=0;i<count;i++) s.run("INSERT INTO copies(id,book_id,barcode,shelf) VALUES(?,?,?,?)",newId(),id,'LUM-'+randomBytes(8).toString('hex').toUpperCase(),str(form.shelf,80));
@@ -230,11 +256,11 @@ export function createService(s) {
       if(!result.changes) fail(404,'NOT_FOUND','Notifica non trovata');
       return {ok:true};
     },
-    broadcast(user,form) {
+    broadcast(user,form,key=null) {
       requireRole(user,['librarian']);
       const role=str(form.role,30),title=needed(form.title,120),body=needed(form.body,600);
       if(!['all','student','faculty','librarian'].includes(role)) fail(400,'INPUT_INVALID','Destinatari non validi');
-      return s.tx(()=>{
+      return idempotent(user,key,'broadcast',form,()=>{
         const users=role==='all'?s.all('SELECT id FROM users WHERE active=1'):s.all('SELECT id FROM users WHERE active=1 AND role=?',role);
         for(const u of users) notify(s,u.id,title,body,'broadcast');
         return {recipients:users.length};
@@ -242,7 +268,11 @@ export function createService(s) {
     },
     subscribe(user,subscription) {
       requireRole(user,['student','faculty','librarian']);
-      if(!subscription || typeof subscription.endpoint!=='string' || !/^https:\/\//.test(subscription.endpoint) || subscription.endpoint.length>2000 || !subscription.keys?.p256dh || !subscription.keys?.auth) fail(400,'INPUT_INVALID','Sottoscrizione push non valida');
+      let endpointHost='';
+      try {const url=new URL(subscription?.endpoint); if(url.protocol!=='https:'||url.username||url.password||url.port) throw 0; endpointHost=url.hostname.toLowerCase();} catch {fail(400,'INPUT_INVALID','Endpoint push non valido');}
+      const approved=['fcm.googleapis.com','fcm-xm.googleapis.com','android.googleapis.com','updates.push.services.mozilla.com','web.push.apple.com'];
+      if(!approved.includes(endpointHost)&&!endpointHost.endsWith('.notify.windows.com')&&!endpointHost.endsWith('.push.apple.com')) fail(400,'PUSH_PROVIDER_DENIED','Provider push non consentito');
+      if(!subscription || typeof subscription.endpoint!=='string' || subscription.endpoint.length>2000 || !subscription.keys?.p256dh || !subscription.keys?.auth) fail(400,'INPUT_INVALID','Sottoscrizione push non valida');
       s.run('INSERT INTO subscriptions(endpoint,user_id,payload,created_at) VALUES(?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,payload=excluded.payload,created_at=excluded.created_at',subscription.endpoint,user.id,JSON.stringify(subscription),now());
       return {ok:true};
     },
