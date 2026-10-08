@@ -1,0 +1,29 @@
+name: CI
+permissions:
+  contents: read
+  pull-requests: write
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install
+      - run: npm run check
+      - name: Run domain and HTTP tests
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee /tmp/lumen-test-report.log
+      - name: Attach failing test report to PR
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment 1 --body-file /tmp/lumen-test-report.log

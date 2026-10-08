@@ -1,0 +1,133 @@
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { resolve, sep, extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { openStore, bootstrap } from './store.mjs';
+import { createService, Failure } from './service.mjs';
+
+const s=openStore(process.env.LUMEN_DB_PATH || './data/lumen.sqlite');
+bootstrap(s);
+const service=createService(s);
+const publicDir=resolve(fileURLToPath(new URL('../public/', import.meta.url)));
+const port=Number(process.env.PORT || 3000);
+const prod=process.env.NODE_ENV==='production';
+const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.png':'image/png','.ico':'image/x-icon'};
+const json=(res,status,data,headers={})=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(JSON.stringify(data));};
+const respond=(res,data,status=200)=>json(res,status,data);
+const cookieToken=req=>{const raw=req.headers.cookie||'';const match=raw.match(/(?:^|;\s*)lumen_session=([^;]+)/);return match?decodeURIComponent(match[1]):'';};
+const cookieAttrs=(maxAge)=>'Path=/; HttpOnly; SameSite=Lax; '+(prod?'Secure; ':'')+'Max-Age='+maxAge;
+const pathId=(path,prefix,suffix='')=>path.startsWith(prefix)&&path.endsWith(suffix)?decodeURIComponent(path.slice(prefix.length,path.length-suffix.length)):null;
+const readJson=async req=>{
+  if(!(req.headers['content-type']||'').toLowerCase().startsWith('application/json')) throw new Failure(415,'JSON_REQUIRED','Invia JSON');
+  let payload='';
+  for await (const chunk of req) {
+    payload+=chunk;
+    if(payload.length>16384) throw new Failure(413,'TOO_LARGE','Richiesta troppo grande');
+  }
+  try {const data=JSON.parse(payload);if(!data||typeof data!=='object'||Array.isArray(data)) throw 0;return data;}
+  catch {throw new Failure(400,'INVALID_JSON','Corpo JSON non valido');}
+};
+const loginHits=new Map();
+function loginLimit(req,email) {
+  const key=String(req.socket.remoteAddress||'unknown')+':'+String(email||'').toLowerCase().slice(0,254);
+  const current=Date.now();
+  const hit=loginHits.get(key)||{from:current,n:0};
+  if(current-hit.from>900000){hit.from=current;hit.n=0;}
+  hit.n++;loginHits.set(key,hit);
+  if(hit.n>12) throw new Failure(429,'RATE_LIMIT','Troppi tentativi: riprova più tardi');
+  if(loginHits.size>20000) for(const [k,v] of loginHits) if(current-v.from>900000) loginHits.delete(k);
+}
+function requireCsrf(req,user) {
+  if(!user) throw new Failure(401,'AUTH_REQUIRED','Effettua l’accesso');
+  if(req.headers['x-csrf-token']!==user.csrf) throw new Failure(403,'CSRF','Token di sicurezza non valido');
+}
+function originGuard(req) {
+  const origin=req.headers.origin;
+  const host=req.headers.host;
+  if(!origin||!host) throw new Failure(403,'ORIGIN_REQUIRED','Origin richiesto');
+  const originURL=new URL(origin);
+  if(originURL.host!==host || !['http:','https:'].includes(originURL.protocol)) throw new Failure(403,'ORIGIN_MISMATCH','Richiesta cross-origin rifiutata');
+}
+const getPublic=async(path,res)=>{
+  const p=path==='/'?'/index.html':path;
+  const target=resolve(publicDir,'.'+p);
+  if(target!==publicDir && !target.startsWith(publicDir+sep)) throw new Failure(404,'NOT_FOUND','Risorsa inesistente');
+  let file;
+  try {file=await readFile(target);} catch {if(!p.includes('.') && !p.startsWith('/api/')) file=await readFile(resolve(publicDir,'index.html'));else throw new Failure(404,'NOT_FOUND','Risorsa inesistente');}
+  const ext=extname(target);
+  res.writeHead(200,{'Content-Type':mime[ext]||'text/html; charset=utf-8','Cache-Control':ext==='.html'||p==='/sw.js'?'no-cache':'public, max-age=3600','X-Content-Type-Options':'nosniff'});
+  res.end(file);
+};
+
+export function buildHandler({ api=service, database=s }={}) {
+  return async (req,res)=>{
+    res.setHeader('X-Content-Type-Options','nosniff');
+    res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+    res.setHeader('X-Frame-Options','DENY');
+    res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');
+    res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+    try {
+      const url=new URL(req.url,'http://localhost');
+      const path=url.pathname,method=req.method;
+      if(path==='/api/health'&&method==='GET') return respond(res,{status:'ok',db:!!database.get('SELECT 1 ok')?.ok});
+      if(!path.startsWith('/api/')) {
+        if(method!=='GET'&&method!=='HEAD') throw new Failure(405,'METHOD_NOT_ALLOWED','Metodo non consentito');
+        return await getPublic(path,res);
+      }
+      const token=cookieToken(req);
+      const user=api.current(token);
+      if(method!=='GET'&&method!=='HEAD') {
+        originGuard(req);
+        if(path!=='/api/login') requireCsrf(req,user);
+      }
+      if(method==='GET'&&path==='/api/me') return respond(res,{user:user?{id:user.id,email:user.email,name:user.name,role:user.role}:null,csrf:user?.csrf||null});
+      if(method==='POST'&&path==='/api/login') {
+        const b=await readJson(req);
+        loginLimit(req,b.email);
+        const result=api.login(b.email,b.password);
+        return json(res,200,{user:result.user,csrf:result.csrf},{'Set-Cookie':'lumen_session='+encodeURIComponent(result.token)+'; '+cookieAttrs(43200)});
+      }
+      if(method==='POST'&&path==='/api/logout'){api.logout(token);return json(res,200,{ok:true},{'Set-Cookie':'lumen_session=; '+cookieAttrs(0)});}
+      if(method==='GET'&&path==='/api/books') return respond(res,api.books(url.searchParams.get('q')||''));
+      if(method==='GET'&&path.startsWith('/api/books/')) return respond(res,api.book(pathId(path,'/api/books/')));
+      if(method==='GET'&&path==='/api/holds') return respond(res,api.holds(user));
+      if(method==='POST'&&path==='/api/holds') {const b=await readJson(req);return respond(res,api.requestHold(user,b.bookId),201);}
+      if(method==='POST'&&path.startsWith('/api/holds/')&&path.endsWith('/cancel')) return respond(res,api.cancelHold(user,pathId(path,'/api/holds/','/cancel')));
+      if(method==='GET'&&path==='/api/loans') return respond(res,api.loans(user));
+      if(method==='POST'&&path.startsWith('/api/loans/')&&path.endsWith('/renew')) return respond(res,api.renew(user,pathId(path,'/api/loans/','/renew')));
+      if(method==='GET'&&path==='/api/suggestions') return respond(res,api.suggestions(user));
+      if(method==='POST'&&path==='/api/suggestions'){const b=await readJson(req);return respond(res,api.suggest(user,b),201);}
+      if(method==='POST'&&path.startsWith('/api/suggestions/')&&path.endsWith('/review')){const b=await readJson(req);return respond(res,api.reviewSuggestion(user,pathId(path,'/api/suggestions/','/review'),b.status));}
+      if(method==='GET'&&path==='/api/notifications') return respond(res,api.notifyList(user));
+      if(method==='POST'&&path.startsWith('/api/notifications/')&&path.endsWith('/read')) return respond(res,api.readNotification(user,pathId(path,'/api/notifications/','/read')));
+      if(method==='GET'&&path==='/api/push-config') return respond(res,{enabled:!!(process.env.VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY),publicKey:process.env.VAPID_PUBLIC_KEY||''});
+      if(method==='POST'&&path==='/api/push-subscription'){const b=await readJson(req);return respond(res,api.subscribe(user,b));}
+      if(method==='DELETE'&&path==='/api/push-subscription'){const b=await readJson(req);return respond(res,api.unsubscribe(user,b.endpoint));}
+      if(method==='GET'&&path==='/api/staff/stats') return respond(res,api.stats(user));
+      if(method==='GET'&&path==='/api/staff/users') return respond(res,api.users(user));
+      if(method==='POST'&&path==='/api/staff/users'){const b=await readJson(req);return respond(res,api.createUser(user,b),201);}
+      if(method==='POST'&&path.startsWith('/api/staff/users/')&&path.endsWith('/disable')) return respond(res,api.disableUser(user,pathId(path,'/api/staff/users/','/disable')));
+      if(method==='POST'&&path==='/api/staff/books'){const b=await readJson(req);return respond(res,api.addBook(user,b),201);}
+      if(method==='POST'&&path==='/api/staff/checkout'){const b=await readJson(req);return respond(res,api.checkout(user,b.userId,b.bookId),201);}
+      if(method==='POST'&&path==='/api/staff/return'){const b=await readJson(req);return respond(res,api.returnLoan(user,b.loanId));}
+      if(method==='POST'&&path==='/api/staff/broadcast'){const b=await readJson(req);return respond(res,api.broadcast(user,b));}
+      throw new Failure(404,'NOT_FOUND','Endpoint inesistente');
+    } catch(error) {
+      const status=error instanceof Failure?error.status:500;
+      if(status===500) console.error(JSON.stringify({level:'error',code:'INTERNAL',message:error.message}));
+      if(!res.headersSent) json(res,status,{error:{code:error.code||'INTERNAL',message:status===500?'Errore interno del servizio':error.message}});
+      else res.end();
+    }
+  };
+}
+
+export async function start() {
+  const server=createServer(buildHandler());
+  server.listen(port,'0.0.0.0',()=>console.log(JSON.stringify({service:'lumen',port,status:'listening'})));
+  if(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    const { beginPushWorker }=await import('./webpush.mjs');
+    beginPushWorker(s,process.env);
+  }
+  return server;
+}
+if(process.argv[1] && resolve(process.argv[1])===resolve(fileURLToPath(import.meta.url))) start().catch(e=>{console.error(e);process.exitCode=1;});
