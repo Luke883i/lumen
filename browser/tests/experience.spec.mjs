@@ -356,3 +356,63 @@ test('Fix E2E: librarian broadcast reaches student inbox without invented OS del
   await expect(student.getByText('Messaggio di prova nella casella.')).toBeVisible();
  }finally{await c1.close();await c2.close();}
 });
+
+
+test('UX-S6A blue identity has real gradients, flat content cards and compact hero across browsers',async({page,isMobile})=>{
+ await page.goto('/');
+ const ui=await page.evaluate(()=>{
+  const hero=document.querySelector('.hero'),search=document.querySelector('.searchbar .search-primary');
+  const card=document.querySelector('.card'),task=document.querySelector('.task-link');
+  const props=element=>getComputedStyle(element);
+  const bounds=hero.getBoundingClientRect();
+  return {
+    background:props(document.body).backgroundColor,
+    hero:props(hero).backgroundImage,
+    search:props(search).backgroundImage,
+    searchForeground:props(search).color,
+    card:props(card).backgroundImage,
+    task:props(task).backgroundImage,
+    width:document.documentElement.scrollWidth,
+    viewport:window.innerWidth,
+    heroHeight:bounds.height,
+    theme:document.querySelector('meta[name="theme-color"]')?.content,
+    primaryText:props(hero).color
+  };
+ });
+ expect(ui.background).toBe('rgb(244, 248, 255)');
+ expect(ui.hero).toContain('linear-gradient');
+ expect(ui.search).toContain('linear-gradient');
+ expect(ui.searchForeground).toBe('rgb(11, 37, 80)');
+ expect(ui.card).toBe('none');
+ expect(ui.task).toBe('none');
+ expect(ui.theme).toBe('#0b2550');
+ expect(ui.primaryText).toBe('rgb(255, 255, 255)');
+ expect(ui.width).toBeLessThanOrEqual(ui.viewport+1);
+ expect(ui.heroHeight).toBeLessThanOrEqual(isMobile?180:240);
+});
+
+test('UX-S6A PWA install icons decode and match new manifest palette on Chromium',async({page})=>{
+ await page.goto('/installazione');
+ const icon=await page.evaluate(async()=>{
+  const manifest=await (await fetch('/manifest.webmanifest')).json();
+  const output=[];
+  for(const n of [192,512]){
+   const element=manifest.icons.find(icon=>icon.sizes===n+'x'+n);
+   const image=new Image();image.src=element.src;await image.decode();
+   const canvas=document.createElement('canvas');canvas.width=n;canvas.height=n;
+   const ctx=canvas.getContext('2d',{willReadFrequently:true});
+   ctx.drawImage(image,0,0);
+   const orb=ctx.getImageData(Math.floor(n/2),Math.floor(n*.26),1,1).data;
+   output.push({width:image.naturalWidth,height:image.naturalHeight,orb:Array.from(orb)});
+  }
+  return {theme:manifest.theme_color,background:manifest.background_color,output};
+ });
+ expect(icon.theme).toBe('#0b2550');
+ expect(icon.background).toBe('#f4f8ff');
+ for(let i=0;i<2;i++){
+  const n=[192,512][i],item=icon.output[i];
+  expect(item.width).toBe(n);expect(item.height).toBe(n);
+  expect(item.orb[2]).toBeGreaterThan(item.orb[0]);
+  expect(item.orb[3]).toBe(255);
+ }
+});

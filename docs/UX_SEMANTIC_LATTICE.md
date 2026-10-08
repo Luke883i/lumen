@@ -1,6 +1,6 @@
 # LUMEN — residual semantic and UX lattice (2026-10-08)
 
-Canonical baseline: UX-S1 and UX-S2 merged; UX-S3 merged; UX-S4 measured compression in progress from main 9f8da5ad6500c1a732b0efb93307adb5b90387ed. This document **does not assert** live Render/Koha/IdP/device/2,000-concurrent certification.
+Canonical baseline: UX-S1–S5 are incorporated in main as of 2026-10-08. UX-S6A blue brand refactor is proposed on an isolated branch; UX-S6B composition audit follows. This document **does not assert** live Render/Koha/IdP/device/2,000-concurrent certification.
 
 ## Product intent: minimum code, maximum understandable action
 
@@ -23,11 +23,13 @@ MERGED baseline (R1–R9b)
           |
      UX-S3 role/task IA and progressive-disclosure recomposition [merged]
           |
-     UX-S4 visual compression and responsive density budgets [PR #14]
+     UX-S4 visual compression and responsive density budgets [merged]
           |
-     UX-S5 end-to-end CTA, accessibility and interaction clarity
+     UX-S5 end-to-end CTA, accessibility and interaction clarity [merged]
           |
-     UX-S6 composition audit: browser traces, mutation tests, review
+     UX-S6A blue palette, controlled gradients and PWA brand sync [this PR]
+          |
+     UX-S6B final composition + accessibility audit, browser traces, review
           | 
           +----------------------+----------------------+
          R10 Render live       R11 real Koha/IdP       R9c physical PWA/push
@@ -118,3 +120,7 @@ Measure computed CSS bounding boxes in real Chromium across desktop 1440×900, A
 ## UX-S5 in flight (PR #16)
 
 Render epoch guards against stale asynchronous page results. Every high-impact form button is disabled and marked aria-busy while its request is in flight. A mutating request that loses its response (network, malformed response or 5xx) becomes explicitly `uncertain`: users are directed to verify the result before submitting again; the initial request's idempotency key is retained. Holds and acquisition proposals expose compact persistent next-step links after server receipts. The browser harness must falsify stale navigation, double submission, interrupted POST and native Escape/focus before promotion to review. UX-S6 remains cross-route audited composition and assistive technology acceptance. No new backend authority is created.
+
+### UX-S6A minimal-cut addendum
+
+The Blue Visual System is a **presentation-only** theme slice: it may change CSS, inline brand SVG, icon raster assets, browser theme and offline cache version, but must not mutate API contracts, user roles, Koha receipts or routing. CSS custom properties remain the source of truth. Tests validate gradient endpoints, accessible label contrast, PWA icon consistency and actual hero bounds; this is not an enterprise UI certification. Next UX-S6B performs formal manual keyboard/screen-reader/contrast evaluation and integrated content-composition signoff. See [UX_BLUE_IDENTITY.md](UX_BLUE_IDENTITY.md).

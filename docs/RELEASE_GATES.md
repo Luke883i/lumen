@@ -115,3 +115,7 @@ Staff reservations are now a paged, staff-authorized read model for queued/ready
 ## UX-S5 — CTA outcome truth and keyboard interaction (PR #16)
 
 A new presentation-only interaction module serializes live screen rendering with an epoch, gates duplicate UI submissions and distinguishes ordinary GET reachability failures from ambiguous POST/PUT/PATCH/DELETE outcomes. Confirmed hold/proposal mutations show concise persistent next-step navigation. `npm run dev` and Render `npm start` are unchanged. Gate: pure state tests plus Playwright against real LUMEN, including a stalled GET arriving late, a stalled POST attempted twice, an interrupted write and Escape/focus from native dialog. Physical device, Koha/IdP interoperability and enterprise capacity remain blocked.
+
+## UX-S6A — Blue visual identity
+
+A blue-centered presentation palette and deliberately restrained gradients have been materialized in CSS and the PWA brand/installed icons. Source-level contrast, density budget and real Chromium computed-style+image-decode tests are required at exact commit SHA. No claim of certified WCAG conformance, OS installation, live Render deploy or enterprise capacity follows from this green test suite. Detailed DoD: [UX_BLUE_IDENTITY.md](UX_BLUE_IDENTITY.md).

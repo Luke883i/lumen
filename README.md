@@ -34,6 +34,10 @@ The [semantic UX lattice](docs/UX_SEMANTIC_LATTICE.md) and [business copy/author
 
 A search, reservation, acquisition and staff action now shows a deterministic in-progress state. Network loss during a **write** is treated as an uncertain outcome; do not submit a second request before checking the authoritative status. Completed local holds and proposals display a small next-step link. The interface rejects stale responses from previous navigation. [UX-S5 action-state contract](docs/UX_S5_ACTIONS.md).
 
+## LUMEN Blue — new visual identity (UX-S6A)
+
+The [Blue Visual System](docs/UX_BLUE_IDENTITY.md) keeps the existing compact UX-S4/S5 composition, with a unified deep-navy/royal-blue/sky palette and **controlled gradients** only on the home hero, primary actions and subtle installation panel. System states (success, warning, error) retain separate semantic colors. Android/Windows PWA icons, the manifest and browser theme use the same identity. Contrast is verified in source-level tests; real-device and assistive-technology reviews remain release gates.
+
 ## LUMEN experience and installable PWA
 
 The [product lattice](docs/PRODUCT_LATTICE.md) and [real-device acceptance matrix](docs/UX_ACCEPTANCE.md) specify the minimal R8–R13 sequence to move from a polished pilot to an evidence-backed enterprise release. R8 introduces LUMEN design tokens, a public **/installazione** guide for Android Chrome and Windows Chrome/Edge, consent-aware Chrome notifications, a native keyboard-accessible confirmation dialog and honest guest/student/faculty/librarian copy. No UI framework or extra package is required.
