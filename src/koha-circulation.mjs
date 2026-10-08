@@ -106,8 +106,32 @@ export function createKohaCirculation(s,koha,config=process.env){
         const state=definitePreflight||definiteRejection?'rejected':'uncertain';
         s.run("UPDATE koha_hold_attempts SET state=?,error_code=?,updated_at=? WHERE id=?",
           state,String(e.code||'KOHA_UNKNOWN').slice(0,80),now(),attemptId);
+        if(state==='uncertain')error(409,'KOHA_RECONCILIATION_REQUIRED',
+          'Koha potrebbe aver registrato la richiesta. Non ripetere: contatta la biblioteca per verificare l’esito.');
         throw e;
       }
+    },
+    async reconcile(staff,attemptId,remoteHoldId){
+      gate();activeUser(s,staff,['librarian']);
+      const attempt=s.get('SELECT * FROM koha_hold_attempts WHERE id=?',attemptId);
+      if(!attempt)error(404,'KOHA_ATTEMPT_MISSING','Operazione da riconciliare non trovata');
+      if(!['reserved','uncertain'].includes(attempt.state))error(409,'KOHA_INVALID_STATE','Operazione già risolta');
+      const hold=await koha.hold(positive(remoteHoldId));
+      if(hold.hold_id!==positive(remoteHoldId)||hold.patron_id!==attempt.patron_id||
+        hold.biblio_id!==attempt.biblio_id||hold.cancellation_date){
+        error(409,'KOHA_RECEIPT_MISMATCH','Il record Koha non conferma questa prenotazione.');
+      }
+      const receipt={source:'koha',status:'confirmed',holdId:hold.hold_id,
+        patronId:hold.patron_id,biblioId:hold.biblio_id,priority:hold.priority??null,reconciled:true};
+      s.tx(()=>{
+        const result=s.run("UPDATE koha_hold_attempts SET state='succeeded',receipt_json=?,updated_at=? WHERE id=? AND state IN ('reserved','uncertain')",
+          JSON.stringify(receipt),now(),attempt.id);
+        if(!result.changes)error(409,'KOHA_INVALID_STATE','Operazione già risolta');
+        s.run('INSERT INTO audit_events(actor_id,operation,request_hash,receipt_hash,idempotency_key,occurred_at) VALUES(?,?,?,?,?,?)',
+          staff.id,'koha_hold_reconciled',attempt.payload_hash,
+          createHash('sha256').update(JSON.stringify(receipt)).digest('hex'),attempt.request_key,now());
+      });
+      return receipt;
     },
     pending(staff){
       gate();activeUser(s,staff,['librarian']);

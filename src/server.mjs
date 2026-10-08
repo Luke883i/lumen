@@ -105,6 +105,10 @@ export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCircul
         return respond(res,await kohaCirculationApi.bind(user,b.userId,b.patronId));
       }
       if(method==='GET'&&path==='/api/staff/koha/pending') return respond(res,kohaCirculationApi.pending(user));
+      if(method==='POST'&&path==='/api/staff/koha/reconcile'){
+        const b=await readJson(req);
+        return respond(res,await kohaCirculationApi.reconcile(user,b.attemptId,b.holdId));
+      }
       if(method==='GET'&&path==='/api/integrations/koha/status') return respond(res,await kohaApi.status());
       if(method==='GET'&&path==='/api/integrations/koha/books') return respond(res,await kohaApi.search(url.searchParams.get('q')||''));
       if(method==='GET'&&path.startsWith('/api/integrations/koha/books/')) return respond(res,await kohaApi.detail(pathId(path,'/api/integrations/koha/books/')));

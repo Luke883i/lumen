@@ -64,6 +64,13 @@ export function makeKoha(config=process.env,transport=fetch){
         status:str(row.status,60),priority:Number(row.priority)||null,waiting_date:row.waiting_date||null,
         cancellation_date:row.cancellation_date||null}));
     },
+    async hold(id){
+      if(!/^[1-9]\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo Koha non valido',400);
+      const data=await get('/api/v1/holds/'+id);
+      if(!data||!Number.isSafeInteger(Number(data.hold_id)))throw new KohaError('KOHA_SCHEMA','Prenotazione Koha non verificabile');
+      return {hold_id:Number(data.hold_id),patron_id:Number(data.patron_id),biblio_id:Number(data.biblio_id),
+        priority:Number(data.priority)||null,cancellation_date:data.cancellation_date||null};
+    },
     async placeHold({patronId,biblioId,pickupLibraryId}){
       if(!/^[1-9]\d{0,11}$/.test(String(patronId))||!/^[1-9]\d{0,11}$/.test(String(biblioId))||
         !/^[\w-]{1,20}$/.test(String(pickupLibraryId)))throw new KohaError('KOHA_INPUT_INVALID','Prenotazione Koha non valida',400);
