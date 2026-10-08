@@ -4,10 +4,12 @@ import { resolve, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openStore, bootstrap } from './store.mjs';
 import { createService, Failure } from './service.mjs';
+import { makeKoha } from './koha.mjs';
 
 const s=openStore(process.env.LUMEN_DB_PATH || './data/lumen.sqlite');
 bootstrap(s);
 const service=createService(s);
+const koha=makeKoha(process.env);
 const publicDir=resolve(fileURLToPath(new URL('../public/', import.meta.url)));
 const port=Number(process.env.PORT || 3000);
 const prod=process.env.NODE_ENV==='production';
@@ -59,7 +61,7 @@ const getPublic=async(path,res)=>{
   res.end(file);
 };
 
-export function buildHandler({ api=service, database=s }={}) {
+export function buildHandler({ api=service, database=s, kohaApi=koha }={}) {
   return async (req,res)=>{
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
@@ -89,6 +91,10 @@ export function buildHandler({ api=service, database=s }={}) {
         return json(res,200,{user:result.user,csrf:result.csrf},{'Set-Cookie':'lumen_session='+encodeURIComponent(result.token)+'; '+cookieAttrs(43200)});
       }
       if(method==='POST'&&path==='/api/logout'){api.logout(token);return json(res,200,{ok:true},{'Set-Cookie':'lumen_session=; '+cookieAttrs(0)});}
+      if(method==='GET'&&path==='/api/config') return respond(res,{koha:{configured:kohaApi.configured,mode:'read_only'}});
+      if(method==='GET'&&path==='/api/integrations/koha/status') return respond(res,await kohaApi.status());
+      if(method==='GET'&&path==='/api/integrations/koha/books') return respond(res,await kohaApi.search(url.searchParams.get('q')||''));
+      if(method==='GET'&&path.startsWith('/api/integrations/koha/books/')) return respond(res,await kohaApi.detail(pathId(path,'/api/integrations/koha/books/')));
       if(method==='GET'&&path==='/api/books') return respond(res,api.books(url.searchParams.get('q')||''));
       if(method==='GET'&&path.startsWith('/api/books/')) return respond(res,api.book(pathId(path,'/api/books/')));
       if(method==='POST'&&path==='/api/change-password'){const b=await readJson(req);return respond(res,api.changePassword(user,b.oldPassword,b.newPassword));}
@@ -115,7 +121,7 @@ export function buildHandler({ api=service, database=s }={}) {
       if(method==='POST'&&path==='/api/staff/broadcast'){const b=await readJson(req);return respond(res,api.broadcast(user,b,idempotencyKey));}
       throw new Failure(404,'NOT_FOUND','Endpoint inesistente');
     } catch(error) {
-      const status=error instanceof Failure?error.status:500;
+      const status=error instanceof Failure || error?.code?.startsWith('KOHA_') ? (error.status||503) : 500;
       if(status===500) console.error(JSON.stringify({level:'error',code:'INTERNAL',message:error.message}));
       if(!res.headersSent) json(res,status,{error:{code:error.code||'INTERNAL',message:status===500?'Errore interno del servizio':error.message}});
       else res.end();
