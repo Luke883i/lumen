@@ -1,137 +1,129 @@
 # LUMEN
 
-LUMEN is a deployable, installable library-services PWA for patrons, faculty and librarians.
+**Open-source webapp bibliotecaria** per studenti, docenti e bibliotecari.
+Catalogo, prenotazioni, prestiti locali, proposte d'acquisto, inbox, PWA e
+notifiche opzionali. Semplice da avviare in GitHub Codespaces e distribuibile
+come *pilot a singola istanza* su Render. LUMEN non dichiara ancora una
+certificazione ILS enterprise o 2.000 utenti concorrenti su infrastruttura reale.
 
-## UX-S2 — Provenienza e viste non autorevoli
+## 1. Aprire LUMEN: un comando in Codespaces
 
-Le schermate mostrano provenienza, stato e possibilità di azione a partire dalle risposte già disponibili: le disponibilità del catalogo LUMEN non vengono trasferite per inferenza a Koha; il rinnovo resta condizionato alle regole del backend; notifiche nell'inbox e consegne sul dispositivo rimangono distinte. Nessuna nuova sorgente autorevole o dipendenza di produzione. [Contratti, DoD ed esempi](docs/UX_PROJECTIONS.md).
-
-## UX-S4: measured visual density
-
-Home, catalogue decorations, staff/task cards and summary metrics are compressed using measured CSS-pixel budgets without shrinking primary tap targets. Chromium validates desktop 1440px, mobile 393px, narrow 320px and 200% type-size reflow. See [UX-S4 density acceptance](docs/UX_S4_DENSITY.md). This is visual QA, not an assertion of WCAG audit or enterprise production scale.
-
-## UX-S3: find the next task
-
-Role-aware navigation now presents at most five primary destinations. A librarian chooses one task on /staff (circulation, catalog, acquisitions, people, communications, integrations), rather than scanning every form at once. Local and Koha services remain distinct. See [UX-S3 IA contract](docs/UX_S3_IA.md). Codespaces still uses npm run dev, Render still uses npm start.
-
-## Prenotazioni e notifiche E2E
-
-Banco → Circolazione presenta ora prenotazioni in coda e pronte, e la casella dei bibliotecari riceve gli avvisi delle nuove richieste. Mentre la pagina è aperta compaiono contatore e toast per nuovi messaggi.
-
-Il normale `npm run dev` avvia LUMEN. Per collaudare le notifiche esterne Chrome, usa separatamente `npm run dev:push`: genera chiavi locali VAPID ignorate da Git, avvia il server e richiede il consenso esplicito del browser nelle Impostazioni. I popup di sistema non sono garantiti e richiedono HTTPS, dispositivo e browser compatibili.
-
-Dettagli, falsificatori e test: [E2E_REQUESTS_NOTIFICATIONS.md](docs/E2E_REQUESTS_NOTIFICATIONS.md).
-
-## R9b — Push identity and device revocation
-
-Web Push is now scoped to authenticated account and session. Browser logout and account replacement revoke old server enrollment; no account can silently take over another endpoint. Legacy push enrollments are cleared on migration and require user opt-in again. [Lifecycle and release gates](docs/PUSH_LIFECYCLE.md).
-
-## UX-S1 — Precise library status and action language
-
-The [semantic UX lattice](docs/UX_SEMANTIC_LATTICE.md) and [business copy/authority audit](docs/UX_COPY_AUDIT.md) define source-bound statuses, clear CTAs and the remaining visual recomposition slices. LUMEN now differentiates local book availability, queued vs ready reservations, approved vs ordered proposals and local server acknowledgements; this does not alter Koha authority. Follow-on UX-S2...S6 handle task projections, navigation, visual compression, CTA quality and composition audit. **Codespaces still runs with `npm run dev`; Render still uses `npm start`.**
-
-## UX-S5 — Linear actions and verified outcomes
-
-A search, reservation, acquisition and staff action now shows a deterministic in-progress state. Network loss during a **write** is treated as an uncertain outcome; do not submit a second request before checking the authoritative status. Completed local holds and proposals display a small next-step link. The interface rejects stale responses from previous navigation. [UX-S5 action-state contract](docs/UX_S5_ACTIONS.md).
-
-## LUMEN Blue — new visual identity (UX-S6A)
-
-The [Blue Visual System](docs/UX_BLUE_IDENTITY.md) keeps the existing compact UX-S4/S5 composition, with a unified deep-navy/royal-blue/sky palette and **controlled gradients** only on the home hero, primary actions and subtle installation panel. System states (success, warning, error) retain separate semantic colors. Android/Windows PWA icons, the manifest and browser theme use the same identity. Contrast is verified in source-level tests; real-device and assistive-technology reviews remain release gates.
-
-## LUMEN experience and installable PWA
-
-The [product lattice](docs/PRODUCT_LATTICE.md) and [real-device acceptance matrix](docs/UX_ACCEPTANCE.md) specify the minimal R8–R13 sequence to move from a polished pilot to an evidence-backed enterprise release. R8 introduces LUMEN design tokens, a public **/installazione** guide for Android Chrome and Windows Chrome/Edge, consent-aware Chrome notifications, a native keyboard-accessible confirmation dialog and honest guest/student/faculty/librarian copy. No UI framework or extra package is required.
-
-Use `npm run dev` in a fresh Codespace and open port 3000; on an HTTPS site, follow **Installa app** in LUMEN or in the browser menu. The resulting PWA opens in a standalone browser window, not as a native APK. Notification delivery requires configured VAPID secrets, explicit user permission, compatible browser/OS support, and remains best-effort; the inbox is always authoritative.
-
-**Browser acceptance:** R9 includes test-only, isolated Playwright Chromium coverage for desktop and Android emulation. After `npm --prefix browser ci` and `npm --prefix browser exec -- playwright install chromium`, run `npm run test:browser`. This is optional QA; **`npm run dev` remains the sole command needed to use LUMEN in a fresh Codespace**. See [browser/README.md](browser/README.md).
-
-**User acceptance still to run:** physical Chrome Android/Windows installation, system notification delivery/tap, screen-reader checks, real Render canary with persistent-state restore, Koha/IdP integration and 2,000 concurrent users. Automated Chromium emulation does not replace real-device evidence.
-
-## One-command Codespaces boot
-
-1. From this repo choose **Code → Codespaces → Create codespace on main**. A clean Codespace uses the Node 24 devcontainer and runs `npm ci` automatically. Existing Codespaces created with an older image require **Codespaces: Rebuild Container**.
-2. In the Codespaces terminal, run the familiar command:
+1. Apri [questo repository](https://github.com/Luke883i/lumen) → **Code →
+   Codespaces → Create codespace** sul branch `main`.
+2. L'immagine Node 24 contiene già `node` e `npm`; l'installazione iniziale
+   esegue automaticamente `npm ci`.
+3. Nella shell del nuovo Codespace esegui:
 
 ```bash
 npm run dev
 ```
 
-3. Open the forwarded port **3000** (keep port visibility **Private**, since demo accounts are intentionally seeded). Demo users: `student@lumen.local`, `faculty@lumen.local`, `librarian@lumen.local` — each password `Demo1234!`.
+Si apre il servizio sulla porta **3000** (URL inoltrato da Codespaces).
+Mantieni la visibilità **Private** perché la modalità sviluppo usa utenti demo.
 
-If the terminal reports `npm: command not found`, use **Codespaces: Rebuild Container**, then `bash scripts/doctor.sh`. A plain `git pull` cannot install a missing runtime into a previously created container.
+| Profilo | Email demo | Password demo |
+|---|---|---|
+| Studente | `student@lumen.local` | `Demo1234!` |
+| Docente | `faculty@lumen.local` | `Demo1234!` |
+| Bibliotecario | `librarian@lumen.local` | `Demo1234!` |
 
-For reproducibility, run `npm run verify:boot`: it starts actual `npm run dev` and `npm start` servers with isolated temporary SQLite databases and verifies health, PWA, catalogue, login, and session. Run `npm run verify:deploy` for the blueprint contract.
+Un Codespace creato prima dell'aggiornamento del devcontainer potrebbe mostrare
+`npm: command not found`: esegui **Codespaces: Rebuild Container** e verifica
+`bash scripts/doctor.sh`. `git pull` da solo non installa Node/npm.
 
-## Deploy on Render — standalone pilot
+**Controlli opzionali (non necessari per usare l'app):**
 
-Connect `main` in **Render → New → Blueprint**, selecting this repository's `render.yaml`. Enter a non-demo `ADMIN_EMAIL` and a strong `ADMIN_PASSWORD` (12+ characters) when prompted. Render provisions a paid **Starter** Node.js web service with a 1 GB persistent disk at `/var/data`. It builds with `npm ci && npm run check && npm test`, then runs `npm start` (which now invokes the production preflight automatically). Only commits whose GitHub checks pass are auto-deployed.
+```bash
+npm run check
+npm test
+npm run check:licenses
+npm run verify:boot
+npm run verify:deploy
+```
 
-After Render shows **Live**, confirm the exact deployed revision with `EXPECTED_SHA=$(git rev-parse HEAD) npm run verify:remote -- https://your-service.onrender.com` (from a matching checkout), then open `https://<your-service>.onrender.com/api/health`, confirm `status: ok` and `db: true`, then use the administrator credentials to sign in and create real users/books. No demonstration dataset is seeded. Push notifications, live Koha and institutional OIDC are optional, separately configured features; enable none until each acceptance gate is met.
+Per i test Chromium desktop/Android emulato consulta
+[browser/README.md](browser/README.md).
 
-**This is a single-instance SQLite pilot, not a high-availability ILS deployment or a 2,000-concurrent-user certification.** Disks cannot be shared by Render replicas and cause a short deployment interruption. Follow the exact environment and rollback procedure in [BOOT_DEPLOY.md](docs/BOOT_DEPLOY.md).
+## 2. Distribuire su Render
 
-## Koha catalogue and opt-in circulation bridge
+Usa **Render → New → Blueprint** con `main` e il
+[`render.yaml`](render.yaml) in radice. Imposta i segreti
+`ADMIN_EMAIL` e `ADMIN_PASSWORD` nell'interfaccia Render.
+Il Blueprint installa tramite `npm ci`, controlla test e sintassi, poi
+avvia **`npm start`** (preflight obbligatorio) e monta SQLite su
+`/var/data/lumen.sqlite`.
 
-Set `KOHA_BASE_URL`, `KOHA_CLIENT_ID`, `KOHA_CLIENT_SECRET` on the server to connect a Koha 25.11 bibliographic catalog with OAuth2; open `/koha` from the navigation. The catalogue is read-only by default. Additional Koha holds, checkout/renewal and verified-return workflows exist behind independent feature flags, with live-system qualification still outstanding. See [Koha integration gates](docs/KOHA.md).
+Dopo lo stato **Live**, dal checkout del commit effettivamente distribuito:
 
-## Load audit
+```bash
+EXPECTED_SHA=$(git rev-parse HEAD) npm run verify:remote -- https://YOUR-SERVICE.onrender.com
+```
 
-The separate [k6 workflow](.github/workflows/load-audit.yml) tests 2,000 synthetic authenticated sessions on a GitHub runner. This is **not** a Render/enterprise/production certification. See [load report protocol](docs/LOAD_AUDIT.md).
+**Importante:** disco persistente + una sola istanza significano che questo
+Blueprint non è alta disponibilità. Esegui backup cifrato fuori da Render,
+prova di restore e test di sicurezza prima di usare dati reali.
+[Runbook e DoD](docs/BOOT_DEPLOY.md) ·
+[Gate di rilascio](docs/RELEASE_GATES.md).
 
-## R3 Koha patron-hold pilot (opt-in)
+## 3. Cosa è implementato e chi detiene l'autorità
 
-The independent Koha catalogue remains available in read-only mode by default. R3 adds a **feature-flagged, Koha-authoritative hold workflow**, without duplicating Koha hold records in SQLite:
+| Dominio | LUMEN standalone | Collegamento esterno |
+|---|---|---|
+| Utenti e ruoli | Account locali; bibliotecario, docente, studente | OIDC istituzionale opzionale |
+| Catalogo e disponibilità | SQLite, catalogo autonomo e copie locali | Koha bibliografico opzionale |
+| Prestiti e prenotazioni | Ciclo di vita locale con ricevute e coda | Koha può essere l'autorità dei propri prestiti |
+| Acquisizioni | Proposte dei docenti e gestione bibliotecario | Non promette acquisto completato senza evidenza |
+| Comunicazioni | Inbox per utente e categoria | Web Push opzionale (consenso, VAPID, HTTPS) |
+| PWA | Browser Android/Windows, installazione se supportata | Nessuna APK nativa/Play Store |
+| Verifica | Node tests e Playwright emulato | Koha/IdP/Android fisico da validare |
 
-1. Supply `KOHA_BASE_URL`, `KOHA_CLIENT_ID`, `KOHA_CLIENT_SECRET`, `KOHA_CIRCULATION_ENABLED=1`, `KOHA_PICKUP_LIBRARY_ID=MAIN` through your secure environment.
-2. Librarian: open `/staff`, select a local user and verify its numerical Koha patron ID; exact email match required.
-3. Patron: open `/koha`, choose a title and request a hold (only after verified mapping).
-4. Patron: use `/koha/me` to see their holds *read directly from Koha*.
-5. If the Koha response is uncertain, librarian: `/staff/koha-pending`, inspect the authoritative Koha record and enter its exact hold ID to confirm. LUMEN never blindly retries an ambiguous write.
+Le funzionalità Koha sono **disabilitate per default** e richiedono configurazione
+OAuth2 e feature flag specifici. R5 verifica le restituzioni dopo il check-in
+eseguito su Koha: non inventa una chiamata REST di check-in. 
+L'SSO OpenID Connect esiste ma richiede accettazione su IdP reale.
 
-See [circulation contract and limitations](docs/KOHA_CIRCULATION.md). This is a **controlled integration slice**, not a tested live production Koha deployment. Live Koha checkout and return validation, institutional IdP acceptance, 2,000-production-concurrency, and enterprise certification remain open gates.
+Per configurare: [Koha](docs/KOHA.md),
+[prestiti Koha](docs/KOHA_LOANS.md),
+[restituzioni Koha](docs/KOHA_RETURNS.md),
+[OIDC](docs/OIDC.md),
+[Web Push](docs/PUSH_LIFECYCLE.md).
 
-## R4 controlled Koha loan pilot
+## 4. Licenza, condizioni d'uso e riconoscimenti
 
-R4 adds Koha-authoritative patron loan listing and renewal, staff checkout issuance, and staff positive reconciliation.
-All R4 routes require BOTH KOHA_CIRCULATION_ENABLED=1 AND KOHA_LOANS_ENABLED=1, plus KOHA_PICKUP_LIBRARY_ID.
-Without both flags the existing R2/R3 runtime behaviour is unchanged.
-Koha is the only source of loan truth; local SQLite stores attempt receipts, not Koha loans.
-Koha warnings, blockers and confirmation requirements stop automated issuance: no override tokens are sent.
-See [R4 loan contracts, verification and DoD](docs/KOHA_LOANS.md).
+**Codice originale LUMEN:** [MIT License](LICENSE), proposta soggetta
+all'approvazione dei titolari dei diritti sul codice e sulle icone prima
+dell'adozione definitiva. La licenza permette riuso, modifica e ridistribuzione,
+anche commerciale, conservando i relativi avvisi, e fornisce il software
+senza garanzie.
 
-DO NOT enable R4 on public production without testing your real Koha instance and operator permissions.
-Direct check-in via LUMEN, live institutional IdP acceptance and enterprise scale/recovery certification remain unfinished.
+**Le condizioni d'uso della biblioteca non sono la licenza del software.**
+L'istituzione che adotta LUMEN deve pubblicare proprie regole di prestito,
+identità, contatti, informative privacy, gestione dati e livelli di servizio.
+Vedi [condizioni e responsabilità](docs/USAGE_TERMS.md).
 
-## R5 staff-assisted Koha return verification
+La Home contiene un riconoscimento compatto **Powered by Node.js + SQLite**.
+La pagina pubblica `/opensource` collega licenza LUMEN, condizioni e
+[licenze dei componenti esterni](docs/THIRD_PARTY_NOTICES.md).
+In particolare, [Koha](https://github.com/Koha-Community/Koha)
+(GPL-3.0-or-later) è una integrazione API facoltativa, **non** un progetto
+vendorizzato o affiliato; [web-push](https://github.com/web-push-libs/web-push)
+è MPL-2.0; [openid-client](https://github.com/panva/openid-client) è MIT.
+FOLIO, Evergreen, SLiMS e Invenio sono riferimenti studiati, non componenti
+installati. [Audit granulare delle 18 PR merged](docs/PR_LINEAGE_AUDIT.md).
 
-R5 adds `/staff/koha-returns` and a positive-evidence check-in verification ticket. A librarian registers the physical return in **Koha staff circulation first**; LUMEN verifies it against Koha's returned-checkout history and records an audit receipt. LUMEN never invents or performs a Koha check-in mutation.
+Per contribuire: [CONTRIBUTING.md](CONTRIBUTING.md). Non inviare mai dati
+personali, endpoint Push, credenziali o token in issue e log pubblici.
 
-The workflow is disabled by default and requires `KOHA_RETURNS_ENABLED=1` together with the R3/R4 flags. Details, staging acceptance, and failure semantics: [R5 Koha return contracts](docs/KOHA_RETURNS.md).
+## 5. Confini epistemici e sicurezza
 
-Check a controlled live Koha fixture without changing library data: `GIT_SHA=$(git rev-parse HEAD) npm run koha:return-smoke`. No live production validation has been executed.
+Verificato in CI non equivale a produzione certificata. In particolare sono
+ancora aperti: prova su Render reale (persistenza/backup/restore), Koha e IdP
+istituzionali reali, notifiche/installazione su dispositivi fisici,
+accessibilità con tecnologie assistive, privacy/security review e workload
+misto di 2.000 concorrenti con resilienza/HA.
 
-## R6 optional institutional Single Sign-On
-
-R6 adds a feature-flagged OpenID Connect authorization-code login with PKCE. A librarian maps each verified provider subject to an existing account; account roles always come from LUMEN, never provider group claims. No new users or privileges are created automatically. The optional OIDC_ONLY=1 setting disables local-password login after the staff setup has been proven.
-
-See [OIDC.md](docs/OIDC.md) for configuration, staff binding, staging tests and production blockers. Without four required server-side OIDC secrets/URLs, the normal R1–R5 local login remains unchanged.
-
-## Non-negotiable architectural boundaries
-
-- **Standalone mode**: self-contained lightweight single-library circulation, not a full ILS. It does **not** claim MARC cataloguing, federated OPAC, inter-library lending, fines, serials or Koha parity.
-- **Koha mode**: future adapter gate, deliberately *not enabled*. Do not write directly to Koha's database or synchronise competing loan authorities without explicit reconciliation.
-- **Production SSO**: institutional OIDC adapter is **not implemented**. Local credential accounts are suitable only for controlled pilot usage with appropriate institutional review.
-- **Performance**: 2,000 active sessions are a target, not a measured capacity. Test p95 latency, throughput and consistency with realistic data before declaring the gate passed.
-- **Web Push**: optional, activated only with VAPID keys; notifications are always persisted in the in-app inbox. Browser permission and subscription are user-controlled.
-- **Email**: not part of this version; no claim of delivery is made.
-
-See [release gates and exact scope](docs/RELEASE_GATES.md), [product contracts](docs/CONTRACTS.md), [state-space audit](docs/STATE_SPACE.md), [operations](docs/OPERATIONS.md) and [architecture decisions](docs/DECISIONS.md).
-
-## Deploy & security checklist
-
-TLS (Render provides it), persistent disk, private credential provisioning, secure cookies, backup strategy for SQLite database and WAL, key rotation procedure, access logs without personal data, account offboarding, privacy notices and retention policy. Disaster recovery and external penetration testing are not certified in this repository.
-
-## Technology
-
-Node.js built-ins (`node:http`, `node:sqlite`, `node:crypto`), a small optional `web-push` dependency, standards-based PWA (HTML/CSS/ES modules/Service Worker). No client build chain. This is an intentional minimum-dependency choice, not a claim that handwritten integration code is cost-free.
+[Architettura](docs/DECISIONS.md) ·
+[Contratti](docs/CONTRACTS.md) ·
+[Tracciabilità source/UX](docs/UX_PROJECTIONS.md) ·
+[Operazioni](docs/OPERATIONS.md) ·
+[Security audit](docs/SECURITY_BIME.md).

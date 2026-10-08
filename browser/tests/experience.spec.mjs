@@ -419,3 +419,17 @@ test('UX-S6A PWA install icons decode and match new manifest palette on Chromium
   expect(item.orb[3]).toBe(255);
  }
 });
+
+test('guest sees truthful open-source attribution and can read usage/license links',async({page})=>{
+ await page.goto('/');
+ const band=page.getByRole('region',{name:'Tecnologie e licenze'});
+ await expect(band).toContainText('Powered by Node.js + SQLite');
+ await expect(band).toContainText('Koha: integrazione API opzionale, non configurata.');
+ await band.getByRole('link',{name:'Licenze e riconoscimenti'}).click();
+ await expect(page).toHaveURL(/\/opensource$/);
+ await expect(page.getByRole('heading',{name:'Open source e riconoscimenti'})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Licenza LUMEN (MIT)'})).toHaveAttribute('href',/\/LICENSE$/);
+ await expect(page.getByRole('link',{name:'Condizioni di utilizzo e responsabilità'})).toHaveAttribute('href',/USAGE_TERMS\.md$/);
+ await expect(page.getByRole('link',{name:'Licenza Koha (GPL-3.0+)'})).toHaveAttribute('href',/Koha\/blob\/main\/LICENSE$/);
+ await expect(page.getByRole('main')).toContainText('FOLIO, Evergreen, SLiMS e Invenio ILS');
+});

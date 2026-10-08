@@ -96,7 +96,7 @@ test('UX-S6A: Android/Windows install PNG assets are branded and readable',()=>{
 
 test('UX-S6A: versioned offline cache includes branded install assets',()=>{
  const sw=read('public/sw.js');
- assert.match(sw,/lumen-static-v5/);
+ assert.match(sw,/lumen-static-v[1-9][0-9]*/);
  for(const file of ['style.css','manifest.webmanifest','lumen.svg','icon-192.png','icon-512.png'])
   assert.ok(sw.includes(file),file+' missing from offline asset cache');
 });

@@ -1,6 +1,7 @@
 import {roleNavigation,activeNavigation,taskLinks,staffAreaFromSearch,STAFF_AREAS} from './navigation.js';
 import {createInboxWatcher} from './notification-watch.js';
 import {createRenderEpoch,mutationFailure,beginAction,afterAction} from './interaction.js';
+import {creditsLinks,creditsProjection} from './credits.js';
 import {libraryCopy,installExperience,pushExperience,actionConfirmation,localHoldResult,localStatus,localActionFeedback,localClickFeedback} from './experience.js';
 import {projectLocalBook,projectKohaBook,projectLocalHold,projectLocalLoan,projectAcquisition,projectNotification,projectPatron,projectKohaOperation} from './projections.js';
 const root=document.querySelector('#root');
@@ -159,7 +160,38 @@ function header(){
     +'<nav class="nav" aria-label="Navigazione principale">'+primaryDesktop+more+account+'</nav></header>'
     +'<nav class="bottom-nav" aria-label="Navigazione mobile">'+bottom+'</nav>';
 }
-function footer(){return '<footer class="shell footer"><div class="row"><span><strong>LUMEN</strong> · Il tuo spazio per la conoscenza</span><span>Servizi bibliotecari · <a data-nav href="/installazione">Installa app</a> · <a data-nav href="/impostazioni">Impostazioni</a></span></div></footer>';}
+function footer(){return '<footer class="shell footer"><div class="row"><span><strong>LUMEN</strong> · Il tuo spazio per la conoscenza</span><span>Servizi bibliotecari · <a data-nav href="/opensource">Open source e licenze</a> · <a data-nav href="/installazione">Installa app</a> · <a data-nav href="/impostazioni">Impostazioni</a></span></div></footer>';}
+function externalCredit(href,label){
+ return '<a href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">'+t(label)+'</a>';
+}
+function creditsBand(){
+ const c=creditsProjection({kohaConfigured:state.koha,oidcEnabled:state.oidcEnabled});
+ return '<section class="section credits-band" aria-label="Tecnologie e licenze"><p><strong>Powered by '+t(c.platform)+'</strong>'
+  +' <span aria-hidden="true">·</span> '+t(c.koha)+'</p>'
+  +'<div class="credits-actions"><a data-nav href="/opensource">Licenze e riconoscimenti</a>'
+  +externalCredit(creditsLinks.source,'Codice sorgente LUMEN')+'</div></section>';
+}
+function openSourcePage(){
+ const c=creditsProjection({kohaConfigured:state.koha,oidcEnabled:state.oidcEnabled});
+ return sectionTitle('Open source e riconoscimenti','Tecnologie effettive, integrazioni facoltative e licenze distinte.')
+  +'<section class="section card license-summary"><h2>Licenza LUMEN</h2><p>'+t(c.license)+'</p>'
+  +'<div class="credits-actions">'+externalCredit(creditsLinks.license,'Licenza LUMEN (MIT)')
+  +externalCredit(creditsLinks.usage,'Condizioni di utilizzo e responsabilità')
+  +externalCredit(creditsLinks.thirdParties,'Avvisi e licenze di terzi')+'</div></section>'
+  +'<section class="section credits-grid">'
+  +'<article class="card"><h2>Powered by</h2><p>Il runtime usa '+t(c.platform)+'. Il catalogo e i prestiti locali sono gestiti da LUMEN.</p>'
+  +'<div class="credits-actions">'+externalCredit(creditsLinks.node,'Node.js')+externalCredit(creditsLinks.sqlite,'SQLite')+'</div></article>'
+  +'<article class="card"><h2>Koha, integrazione opzionale</h2><p>'+t(c.koha)+'</p>'
+  +'<div class="credits-actions">'+externalCredit(creditsLinks.koha,'Progetto Koha')
+  +externalCredit(creditsLinks.kohaLicense,'Licenza Koha (GPL-3.0+)')+'</div></article>'
+  +'<article class="card"><h2>Estensioni e prove</h2><p>'+t(c.oidc)+' Web Push è facoltativo; Playwright è usato nei test.</p>'
+  +'<div class="credits-actions">'+externalCredit(creditsLinks.oidc,'openid-client')
+  +externalCredit(creditsLinks.webPush,'web-push')+externalCredit(creditsLinks.playwright,'Playwright')+'</div></article>'
+  +'</section>'
+  +'<p class="fine">FOLIO, Evergreen, SLiMS e Invenio ILS sono stati studiati come riferimenti: non sono componenti del runtime. '
+  +externalCredit(creditsLinks.thirdParties,'Consulta le fonti e le rispettive condizioni')+'. '
+  +'LUMEN non è affiliata ai produttori o alle comunità dei progetti citati.</p>';
+}
 function bookCard(b){
   const v=projectLocalBook(b,{role:state.user?.role});
   const availability=badge(v.label,v.status==='available'?'':'warn');
@@ -170,7 +202,8 @@ async function home(){
   return '<section class="hero" aria-label="Cerca nella biblioteca"><p class="eyebrow">La tua biblioteca, ovunque</p><h1>Ogni libro apre una possibilità.</h1>'+formSearch()+'<p class="hero-install"><a data-nav href="/installazione">Installa LUMEN sul dispositivo →</a></p></section>'
   +taskHub('Cosa puoi fare')
   +'<section class="section"><div class="section-head"><h2>Dal catalogo</h2><a class="btn alt small" data-nav href="/catalogo">Vedi tutti →</a></div><div class="grid">'+(books.length?books.slice(0,3).map(bookCard).join(''):empty('Il catalogo sarà disponibile a breve.'))+'</div></section>'
-  +'<section class="section"><div class="card"><h2>La biblioteca e LUMEN</h2><p>'+t(libraryCopy.context)+'</p><p>LUMEN è il punto di accesso digitale ai servizi bibliotecari: non sostituisce i sistemi gestionali della biblioteca e mantiene separati gli esiti delle integrazioni esterne.</p><p class="fine">Sedi, orari, contatti e condizioni di prestito saranno indicati dalla biblioteca prima della pubblicazione ufficiale.</p></div></section>';
+  +'<section class="section"><div class="card"><h2>La biblioteca e LUMEN</h2><p>'+t(libraryCopy.context)+'</p><p>LUMEN è il punto di accesso digitale ai servizi bibliotecari: non sostituisce i sistemi gestionali della biblioteca e mantiene separati gli esiti delle integrazioni esterne.</p><p class="fine">Sedi, orari, contatti e condizioni di prestito saranno indicati dalla biblioteca prima della pubblicazione ufficiale.</p></div></section>'
+  +creditsBand();
 }
 async function catalog(){
   const q=new URLSearchParams(location.search).get('q')||'';
@@ -371,6 +404,7 @@ async function kohaReturnsDesk(){
 async function view(){
   const path=location.pathname;
   if(path==='/')return home();
+  if(path==='/opensource')return openSourcePage();
   if(path==='/installazione')return installPage();
   if(path==='/catalogo')return catalog();
   if(path==='/koha'&&state.koha)return kohaCatalog();
