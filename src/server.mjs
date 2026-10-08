@@ -202,6 +202,10 @@ export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCircul
       if(method==='DELETE'&&path==='/api/push-subscription'){const b=await readJson(req);return respond(res,api.unsubscribe(user,b.endpoint));}
       if(method==='GET'&&path==='/api/staff/audit') return respond(res,api.audit(user,url.searchParams.get('limit')));
       if(method==='GET'&&path==='/api/staff/stats') return respond(res,api.stats(user));
+      if(method==='GET'&&path==='/api/staff/holds') return respond(res,api.staffHolds(user,{
+        offset:url.searchParams.get('offset')===null?0:Number(url.searchParams.get('offset')),
+        limit:url.searchParams.get('limit')===null?50:Number(url.searchParams.get('limit'))
+      }));
       if(method==='GET'&&path==='/api/staff/users') return respond(res,api.users(user));
       if(method==='POST'&&path==='/api/staff/users'){const b=await readJson(req);return respond(res,api.createUser(user,b),201);}
       if(method==='POST'&&path.startsWith('/api/staff/users/')&&path.endsWith('/disable')) return respond(res,api.disableUser(user,pathId(path,'/api/staff/users/','/disable')));

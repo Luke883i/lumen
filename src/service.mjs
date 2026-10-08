@@ -13,6 +13,12 @@ const minLength = (v,n) => typeof v === 'string' && v.length>=n;
 function notify(s, userId, title, body, kind='general') {
   s.run("INSERT INTO notifications(id,user_id,title,body,kind,created_at) VALUES(?,?,?,?,?,?)",newId(),userId,title,body,kind,now());
 }
+// Transactional fan-out: all active librarians receive operational inbox
+// notices. Browser push is a separate optional transport over this inbox.
+function notifyStaff(s,title,body,kind){
+  for(const {id} of s.all("SELECT id FROM users WHERE role='librarian' AND active=1"))
+    notify(s,id,title,body,kind);
+}
 function requireRole(user, roles) {
   if(!user) fail(401,'AUTH_REQUIRED','Effettua l’accesso');
   if(!user.active) fail(403,'ACCOUNT_DISABLED','Account disabilitato');
@@ -139,7 +145,8 @@ export function createService(s) {
         s.run("INSERT INTO holds(id,book_id,user_id,status,created_at,updated_at) VALUES(?,?,?,?,?,?)",id,bookId,user.id,'queued',stamp,stamp);
         promote(s,bookId);
         const result=s.get("SELECT * FROM holds WHERE id=?",id);
-        if(result.status==='queued') notify(s,user.id,'Prenotazione in coda','La richiesta e stata registrata.','hold_queued');
+        if(result.status==='queued') notify(s,user.id,'Prenotazione in coda','La richiesta è stata registrata.','hold_queued');
+        notifyStaff(s,'Nuova prenotazione LUMEN','Una prenotazione è '+(result.status==='ready'?'pronta al ritiro':'in coda')+'. Apri Banco → Circolazione per gestirla.','staff_hold');
         return result;
       });
     },
@@ -211,6 +218,7 @@ export function createService(s) {
         const id=newId();
         s.run("INSERT INTO suggestions(id,user_id,title,author,isbn,reason,status,created_at) VALUES(?,?,?,?,?,?,?,?)",id,user.id,title,author,isbn,reason,'pending',now());
         notify(s,user.id,'Proposta ricevuta','La biblioteca valuterà la tua richiesta.','suggestion');
+        notifyStaff(s,'Nuova proposta di acquisto','Un docente ha inviato una proposta. Apri Banco → Acquisizioni per valutarla.','staff_acquisition');
         return {id,status:'pending'};
       });
     },
@@ -344,6 +352,17 @@ export function createService(s) {
       requireRole(user,['librarian']);
       const bounded=Math.max(1,Math.min(200,Number(limit)||100));
       return s.all('SELECT sequence,actor_id,operation,request_hash,receipt_hash,idempotency_key,occurred_at FROM audit_events ORDER BY sequence DESC LIMIT ?',bounded);
+    },
+    staffHolds(user,{offset=0,limit=50}={}){
+      requireRole(user,['librarian']);
+      const take=Number(limit),skip=Number(offset);
+      if(!Number.isSafeInteger(take)||take<1||take>100||
+         !Number.isSafeInteger(skip)||skip<0||skip>1000000)
+        fail(400,'PAGINATION_INVALID','Paginazione prenotazioni non valida');
+      const where="h.status IN ('queued','ready')";
+      const total=s.get('SELECT count(*) n FROM holds h WHERE '+where).n;
+      const rows=s.all("SELECT h.id,h.book_id,h.user_id,h.status,h.created_at,h.updated_at,b.title,b.author,u.name AS patron,u.role AS patron_role FROM holds h JOIN books b ON b.id=h.book_id JOIN users u ON u.id=h.user_id WHERE "+where+" ORDER BY CASE h.status WHEN 'ready' THEN 0 ELSE 1 END,h.created_at,h.id LIMIT ? OFFSET ?",take,skip);
+      return {rows,total,offset:skip,limit:take,source:'lumen_standalone'};
     },
     stats(user) {
       requireRole(user,['librarian']);
