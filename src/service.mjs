@@ -77,10 +77,14 @@ export function createService(s) {
     },
     logout(token) { if(token) s.run("DELETE FROM sessions WHERE token_hash=?",tokenHash(token)); },
     books(query='') {
-      const q=str(query,120).toLowerCase();
-      const pattern='%'+q.replace(/[%_\\]/g,'\\$&')+'%';
-      const books=s.all("SELECT b.*, (SELECT count(*) FROM copies c WHERE c.book_id=b.id) AS copies, (SELECT count(*) FROM loans l JOIN copies c ON c.id=l.copy_id WHERE c.book_id=b.id AND l.status='active') AS borrowed, (SELECT count(*) FROM holds h WHERE h.book_id=b.id AND h.status='ready') AS reserved, (SELECT count(*) FROM holds h WHERE h.book_id=b.id AND h.status='queued') AS queue FROM books b WHERE (?='' OR lower(b.title) LIKE ? ESCAPE '\\' OR lower(b.author) LIKE ? ESCAPE '\\' OR lower(b.isbn) LIKE ? ESCAPE '\\' OR lower(b.subject) LIKE ? ESCAPE '\\') ORDER BY lower(b.title),b.id LIMIT 120",
-      q,pattern,pattern,pattern,pattern);
+      const q=str(query,120);
+      const words=(q.normalize('NFKC').match(/[\\p{L}\\p{N}]+/gu)||[]).slice(0,6);
+      if(q.trim() && !words.length) return [];
+      const match=words.map(w=>'"'+w.toLowerCase()+'"*').join(' AND ');
+      const columns="SELECT b.*, (SELECT count(*) FROM copies c WHERE c.book_id=b.id) AS copies, (SELECT count(*) FROM loans l JOIN copies c ON c.id=l.copy_id WHERE c.book_id=b.id AND l.status='active') AS borrowed, (SELECT count(*) FROM holds h WHERE h.book_id=b.id AND h.status='ready') AS reserved, (SELECT count(*) FROM holds h WHERE h.book_id=b.id AND h.status='queued') AS queue";
+      const books=match
+        ? s.all(columns+" FROM books_fts f JOIN books b ON b.rowid=f.rowid WHERE books_fts MATCH ? ORDER BY lower(b.title),b.id LIMIT 120",match)
+        : s.all(columns+" FROM books b ORDER BY lower(b.title),b.id LIMIT 120");
       return books.map(({copies,borrowed,reserved,...b})=>({...b,copies,available:Math.max(0,copies-borrowed-reserved),reserved,borrowed}));
     },
     book(id) {

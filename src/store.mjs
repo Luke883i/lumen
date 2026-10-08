@@ -37,13 +37,25 @@ const ddl = [
   "CREATE INDEX IF NOT EXISTS idx_holds_queue ON holds(book_id,status,created_at,id)",
   "CREATE INDEX IF NOT EXISTS idx_loans_user ON loans(user_id,status)",
   "CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS idempotency (user_id TEXT NOT NULL, key TEXT NOT NULL, operation TEXT NOT NULL, payload_hash TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(user_id,key))"
+  "CREATE TABLE IF NOT EXISTS idempotency (user_id TEXT NOT NULL, key TEXT NOT NULL, operation TEXT NOT NULL, payload_hash TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(user_id,key))",
+  "CREATE VIRTUAL TABLE IF NOT EXISTS books_fts USING fts5(title,author,isbn,subject,content='books',content_rowid='rowid',tokenize='unicode61 remove_diacritics 2')",
+  "CREATE TRIGGER IF NOT EXISTS books_fts_ai AFTER INSERT ON books BEGIN INSERT INTO books_fts(rowid,title,author,isbn,subject) VALUES(new.rowid,new.title,new.author,new.isbn,new.subject); END",
+  "CREATE TRIGGER IF NOT EXISTS books_fts_ad AFTER DELETE ON books BEGIN INSERT INTO books_fts(books_fts,rowid,title,author,isbn,subject) VALUES('delete',old.rowid,old.title,old.author,old.isbn,old.subject); END",
+  "CREATE TRIGGER IF NOT EXISTS books_fts_au AFTER UPDATE ON books BEGIN INSERT INTO books_fts(books_fts,rowid,title,author,isbn,subject) VALUES('delete',old.rowid,old.title,old.author,old.isbn,old.subject); INSERT INTO books_fts(rowid,title,author,isbn,subject) VALUES(new.rowid,new.title,new.author,new.isbn,new.subject); END"
 ];
 
 export function openStore(path = './data/lumen.sqlite') {
   if (path !== ':memory:') mkdirSync(dirname(resolve(path)), { recursive: true });
   const db = new DatabaseSync(path);
   for (const sql of ddl) db.exec(sql);
+  if (!db.prepare("SELECT 1 FROM metadata WHERE key='catalog_fts_v1'").get()) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec("INSERT INTO books_fts(books_fts) VALUES('rebuild')");
+      db.prepare("INSERT INTO metadata(key,value) VALUES('catalog_fts_v1','built')").run();
+      db.exec('COMMIT');
+    } catch(e) { db.exec('ROLLBACK'); throw e; }
+  }
   const store = {
     db,
     get(sql, ...params) { return db.prepare(sql).get(...params); },

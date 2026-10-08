@@ -169,3 +169,15 @@ test('multiple simultaneous sessions per account are supported but capped',()=>{
   assert.ok(svc.current(sixth.token));
   s.close();
 });
+
+test('FTS catalogue index supports multi-term prefix and accent-insensitive searches',()=>{
+  const {s,svc,user}=fixture(),staff=user('librarian');
+  const b=svc.addBook(staff,{title:'Analisi matematica avanzata',author:'Émile Dupré',subject:'Calcolo',isbn:'978-1234',copies:1});
+  assert.equal(svc.books('Analisi matem')[0].id,b.id);
+  assert.equal(svc.books('Emile')[0].id,b.id);
+  assert.equal(svc.books('978 1234')[0].id,b.id);
+  assert.equal(svc.books('%').length,0);
+  const queryPlan=s.get("EXPLAIN QUERY PLAN SELECT b.id FROM books_fts f JOIN books b ON b.rowid=f.rowid WHERE books_fts MATCH ?",'"analisi"*');
+  assert.ok(queryPlan.detail.includes('VIRTUAL TABLE INDEX'));
+  s.close();
+});
