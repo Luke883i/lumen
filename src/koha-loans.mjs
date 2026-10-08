@@ -40,7 +40,7 @@ export function createKohaLoans(s,koha,config=process.env){
         s.run("INSERT INTO koha_loan_attempts(id,actor_id,patron_id,item_id,checkout_id,kind,request_key,payload_hash,state,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
           recordId,actor.id,details.patronId,details.itemId??null,details.checkoutId??null,kind,key,digest,'reserved',now(),now());
       }catch(e){
-        if(e.code?.startsWith('SQLITE_CONSTRAINT'))fail(409,'KOHA_RECONCILIATION_REQUIRED','Operazione per lo stesso volume ancora incerta');
+        if(e.code?.startsWith('SQLITE_CONSTRAINT')||/UNIQUE constraint failed/i.test(e.message||''))fail(409,'KOHA_RECONCILIATION_REQUIRED','Operazione per lo stesso volume ancora incerta');
         throw e;
       }
       return {recordId,digest};

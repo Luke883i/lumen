@@ -77,7 +77,8 @@ test('staff-only Koha checkout requires a bound patron and no Koha blockers/warn
  assert.equal(x.calls.issue,0);x.s.close();
 });
 test('staff checkout timeout requires remote receipt reconciliation; mismatch remains pending',async()=>{
- const f=fixture({async issueCheckout(){throw Object.assign(new Error('lost response'),{code:'KOHA_NETWORK'});}});
+ const f=fixture({async issueCheckout(){throw Object.assign(new Error('lost response'),{code:'KOHA_NETWORK'});},
+  async checkout(id){return {checkout_id:id,patron_id:202,item_id:81,renewals_count:0,checkin_date:null};}});
  await fails(()=>f.loans.issue(f.staff,f.student.id,81,'checkout-uncertain-001'),'KOHA_RECONCILIATION_REQUIRED');
  const pending=f.loans.pending(f.staff);assert.equal(pending.length,1);
  await fails(()=>f.loans.reconcile(f.student,pending[0].id,600),'FORBIDDEN');
