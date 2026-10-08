@@ -133,7 +133,7 @@ function sectionTitle(title,intro=''){return '<div class="page-top"><h1>'+t(titl
 function field(label,name,placeholder='',required=true,type='text'){
   return '<label>'+t(label)+'<input type="'+type+'" name="'+name+'" placeholder="'+esc(placeholder)+'" '+(required?'required':'')+'></label>';
 }
-function formSearch(value='') {return '<form class="searchbar" data-form="search"><label class="sr" for="catalog-search" style="position:absolute;left:-9999px">Ricerca catalogo</label><input id="catalog-search" name="query" value="'+esc(value)+'" placeholder="Titolo, autore, ISBN, materia…" aria-label="Cerca nel catalogo"><button class="btn gold" type="submit">'+ic('search')+' Cerca</button></form>';}
+function formSearch(value='') {return '<form class="searchbar" data-form="search"><label class="sr" for="catalog-search" style="position:absolute;left:-9999px">Ricerca catalogo</label><input id="catalog-search" name="query" value="'+esc(value)+'" placeholder="Titolo, autore, ISBN, materia…" aria-label="Cerca nel catalogo"><button class="btn search-primary" type="submit">'+ic('search')+' Cerca</button></form>';}
 function navigationContext(){
   return {role:state.user?.role||null,authenticated:!!state.user,
     koha:state.koha,kohaWrite:state.kohaWrite,kohaLoans:state.kohaLoans};
@@ -300,7 +300,7 @@ async function kohaCatalog(){
   const items=result.items||[];
   const cards=items.map(b=>'<article class="card book-card"><div class="cover">'+bookIcon+'</div><div><h3><a data-nav href="/koha/'+esc(b.id.slice(5))+'">'+t(b.title)+'</a></h3><p class="fine">'+t(b.author)+' · '+t(b.isbn||'ISBN non presente')+'</p>'+badge(projectKohaBook(b,{configured:state.koha,writeEnabled:state.kohaWrite,role:state.user?.role}).label,'gray')+'</div></article>').join('');
   return sectionTitle('Catalogo Koha',state.kohaWrite?'Fonte Koha: ricerca e prenotazioni per utenti verificati.':'Fonte Koha in sola lettura.')
-    +'<form class="searchbar" data-form="koha-search"><input name="query" placeholder="Titolo, autore o ISBN" value="'+esc(q)+'" aria-label="Cerca su Koha"><button class="btn gold" type="submit">Cerca</button></form>'
+    +'<form class="searchbar" data-form="koha-search"><input name="query" placeholder="Titolo, autore o ISBN" value="'+esc(q)+'" aria-label="Cerca su Koha"><button class="btn search-primary" type="submit">Cerca</button></form>'
     +'<section class="section"><div class="grid">'+(cards||empty('Nessun risultato da Koha.'))+'</div>'+(result.truncated?'<p class="fine">Sono disponibili altri record: la paginazione avanzata sarà introdotta nel gate K2.</p>':'')+'</section>';
 }
 async function kohaDetail(){
