@@ -105,7 +105,8 @@ function showActionResult(kind,content){
   const next=document.createElement('a');next.href=action.href;next.dataset.nav='';
   next.textContent=action.label;next.className='btn alt small';
   region.append(detail,next);
-  main.querySelector('.page-top')?.after(region)||main.prepend(region);
+  const heading=main.querySelector('.page-top');
+  if(heading)heading.after(region);else main.prepend(region);
 }
 const installModel=()=>installExperience({
   standalone:matchMedia('(display-mode: standalone)').matches||navigator.standalone===true,
