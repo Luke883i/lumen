@@ -47,8 +47,58 @@ export function makeKoha(config=process.env,transport=fetch){
   function normalized(b){
     return {id:'koha:'+String(b.biblio_id),title:str(b.title),author:str(b.author),isbn:str(b.isbn),subject:str(b.subject),description:str(b.abstract),source:'koha',availability:'unknown'};
   }
+  function normalizeCheckout(row){
+    const valid=x=>Number.isSafeInteger(Number(x))&&Number(x)>0;
+    if(!row||!valid(row.checkout_id)||!valid(row.patron_id)||!valid(row.item_id))
+      throw new KohaError('KOHA_CHECKOUT_SCHEMA','Ricevuta prestito Koha incompleta');
+    return {checkout_id:Number(row.checkout_id),patron_id:Number(row.patron_id),item_id:Number(row.item_id),
+      due_date:str(row.due_date,40),checkin_date:row.checkin_date||null,
+      renewals_count:Number(row.renewals_count)||0,library_id:str(row.library_id,30),
+      last_renewed_date:row.last_renewed_date||null,checkout_date:row.checkout_date||null};
+  }
   return {
     configured:true,
+    async checkoutsForPatron(id){
+      if(!/^[1-9]\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo patron non valido',400);
+      const rows=await get('/api/v1/checkouts?patron_id='+id+'&_per_page=100');
+      if(!Array.isArray(rows)||rows.length>=100)throw new KohaError('KOHA_CHECKOUT_PAGINATION','Lista prestiti Koha incompleta o non valida');
+      if(rows.some(row=>Number(row.patron_id)!==Number(id)))throw new KohaError('KOHA_OWNER_MISMATCH','Koha ha restituito un prestito di un altro utente');
+      return rows.map(normalizeCheckout);
+    },
+    async checkout(id){
+      if(!/^[1-9]\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo prestito non valido',400);
+      return normalizeCheckout(await get('/api/v1/checkouts/'+id));
+    },
+    async renewalAvailability(id){
+      if(!/^[1-9]\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo prestito non valido',400);
+      const response=await get('/api/v1/checkouts/'+id+'/allows_renewal');
+      if(typeof response?.allows_renewal!=='boolean')throw new KohaError('KOHA_SCHEMA','Regola rinnovo Koha non valida');
+      return {allowed:response.allows_renewal,current:Number(response.current_renewals)||0,max:Number(response.max_renewals)||0,reason:str(response.error,140)};
+    },
+    async renewCheckout(id){
+      if(!/^[1-9]\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo prestito non valido',400);
+      const auth=await token();
+      const response=await request('/api/v1/checkouts/'+id+'/renewals',{method:'POST',
+        headers:{Authorization:'Bearer '+auth,Accept:'application/json'}});
+      return normalizeCheckout(response);
+    },
+    async checkoutAvailability(patronId,itemId){
+      if(!/^[1-9]\d{0,11}$/.test(String(patronId))||!/^[1-9]\d{0,11}$/.test(String(itemId)))throw new KohaError('KOHA_ID_INVALID','Identificativo non valido',400);
+      const response=await get('/api/v1/checkouts/availability?patron_id='+patronId+'&item_id='+itemId);
+      if(!response||typeof response.blockers!=='object'||typeof response.confirms!=='object'||typeof response.warnings!=='object')
+        throw new KohaError('KOHA_SCHEMA','Esito disponibilità prestito non verificabile');
+      return response;
+    },
+    async issueCheckout({patronId,itemId,libraryId}){
+      if(!/^[1-9]\d{0,11}$/.test(String(patronId))||!/^[1-9]\d{0,11}$/.test(String(itemId))||!/^[A-Za-z0-9_-]{1,20}$/.test(String(libraryId)))
+        throw new KohaError('KOHA_INPUT_INVALID','Identificativi prestito non validi',400);
+      const auth=await token();
+      const response=await request('/api/v1/checkouts',{method:'POST',
+        headers:{Authorization:'Bearer '+auth,Accept:'application/json','Content-Type':'application/json'},
+        body:JSON.stringify({patron_id:Number(patronId),item_id:Number(itemId),library_id:libraryId})});
+      return normalizeCheckout(response);
+    },
+
     async patron(id){
       if(!/^[1-9]\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo Koha non valido',400);
       const patron=await get('/api/v1/patrons/'+id);
