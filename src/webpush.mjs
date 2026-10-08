@@ -13,15 +13,15 @@ export async function beginPushWorker(s,env=process.env,{client,manual=false}={}
         // Do not deliver queued notifications for disabled accounts. A formerly
         // active account can be disabled during any awaited transport operation.
         if(!s.get('SELECT 1 FROM users WHERE id=? AND active=1',row.user_id))continue;
-        const subs=s.all('SELECT endpoint,payload FROM subscriptions WHERE user_id=?',row.user_id);
+        const subs=s.all('SELECT endpoint,payload,session_hash FROM subscriptions WHERE user_id=?',row.user_id);
         if(!subs.length){
           s.run("UPDATE notifications SET push_status='skipped' WHERE id=? AND push_status='pending'",row.id);
           continue;
         }
         let success=0;
         for(const sub of subs){
-          const alive=s.get('SELECT 1 FROM subscriptions p JOIN users u ON u.id=p.user_id WHERE p.endpoint=? AND p.user_id=? AND p.payload=? AND u.active=1',
-            sub.endpoint,row.user_id,sub.payload);
+          const alive=s.get('SELECT 1 FROM subscriptions p JOIN users u ON u.id=p.user_id WHERE p.endpoint=? AND p.user_id=? AND p.payload=? AND p.session_hash=? AND u.active=1',
+            sub.endpoint,row.user_id,sub.payload,sub.session_hash);
           if(!alive)continue;
           try{
             await webpush.sendNotification(JSON.parse(sub.payload),JSON.stringify({
@@ -30,7 +30,8 @@ export async function beginPushWorker(s,env=process.env,{client,manual=false}={}
             success++;
           }catch(e){
             if(e.statusCode===404||e.statusCode===410){
-              s.run('DELETE FROM subscriptions WHERE endpoint=? AND user_id=? AND payload=?',sub.endpoint,row.user_id,sub.payload);
+              s.run('DELETE FROM subscriptions WHERE endpoint=? AND user_id=? AND payload=? AND session_hash=?',
+                sub.endpoint,row.user_id,sub.payload,sub.session_hash);
             }else{
               console.error(JSON.stringify({event:'push_failed',status:e.statusCode||'unknown'}));
             }

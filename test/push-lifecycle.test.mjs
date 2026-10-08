@@ -163,3 +163,23 @@ test('expired provider endpoints are removed only if their owner and payload sti
   assert.equal(f.s.get('SELECT count(*) n FROM subscriptions').n,0);
  }finally{f.s.close();}
 });
+
+test('stale 410 response does not delete a same-account renewed session binding',async()=>{
+ const f=fixture(),a=f.login(f.student),b=f.login(f.student);
+ try{
+  f.api.subscribe(f.student,sub('refresh-race'),a);
+  f.s.run('INSERT INTO notifications(id,user_id,title,body,kind,created_at) VALUES(?,?,?,?,?,?)',
+    'push-expired-race',f.student.id,'Notice','Generic','general',new Date().toISOString());
+  const client={async sendNotification(){
+    f.api.subscribe(f.student,sub('refresh-race'),b);
+    throw {statusCode:410};
+  }};
+  const worker=await beginPushWorker(f.s,{}, {client,manual:true});
+  await worker.tick();
+  assert.equal(f.api.subscriptionStatus(f.student,endpoint('refresh-race')).owned,true);
+  f.api.logout(a);
+  assert.equal(f.api.subscriptionStatus(f.student,endpoint('refresh-race')).owned,true);
+  f.api.logout(b);
+  assert.equal(f.s.get('SELECT count(*) n FROM subscriptions').n,0);
+ }finally{f.s.close();}
+});

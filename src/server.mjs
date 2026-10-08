@@ -96,6 +96,9 @@ export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCircul
         // The authorization code is exchanged server-side; URL query is not logged or returned.
         try{
           const session=await oidcApi.finish(flowCookie(req),url.searchParams.get('state'),url.search);
+          // Switching identities in the same browser must revoke push bound to
+          // the displaced login cookie, even if the user skipped Logout.
+          api.logout(cookieToken(req));
           res.writeHead(303,{'Location':'/me','Cache-Control':'no-store',
             'Set-Cookie':['lumen_session='+encodeURIComponent(session.token)+'; '+cookieAttrs(43200),
               'lumen_oidc_flow=; '+cookieAttrs(0)]});
@@ -126,6 +129,7 @@ export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCircul
         const b=await readJson(req);
         loginLimit(req,b.email);
         const result=api.login(b.email,b.password);
+        api.logout(token); // Revoke any displaced browser identity's push.
         return json(res,200,{user:result.user,csrf:result.csrf},{'Set-Cookie':'lumen_session='+encodeURIComponent(result.token)+'; '+cookieAttrs(43200)});
       }
       if(method==='POST'&&path==='/api/logout'){api.logout(token);return json(res,200,{ok:true},{'Set-Cookie':'lumen_session=; '+cookieAttrs(0)});}
