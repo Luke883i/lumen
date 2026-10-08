@@ -360,6 +360,9 @@ test('Fix E2E: librarian broadcast reaches student inbox without invented OS del
 
 test('UX-S6A blue identity has real gradients, flat content cards and compact hero across browsers',async({page,isMobile})=>{
  await page.goto('/');
+ // Navigation can resolve before the async catalogue/render completes on mobile.
+ await expect(page.locator('.hero')).toBeVisible();
+ await expect(page.locator('.task-link').first()).toBeVisible();
  const ui=await page.evaluate(()=>{
   const hero=document.querySelector('.hero'),search=document.querySelector('.searchbar .search-primary');
   const card=document.querySelector('.card'),task=document.querySelector('.task-link');
