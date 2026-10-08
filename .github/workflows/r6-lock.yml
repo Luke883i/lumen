@@ -1,0 +1,24 @@
+name: R6 dependency graph (temporary)
+on:
+  push:
+    branches: [feat/lumen-r6-oidc-institutional-identity]
+    paths: ['package.json', '.github/workflows/r6-lock.yml']
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  generate-lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --package-lock-only --ignore-scripts
+      - name: Publish lockfile for commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo 'LOCK_R6_BEGIN'; cat package-lock.json; echo 'LOCK_R6_END'; } > /tmp/oidc-lock.txt
+          gh pr comment 6 --body-file /tmp/oidc-lock.txt

@@ -1,0 +1,25 @@
+# R6 — Institutional OIDC identity
+
+Use openid-client v6 for Authorization Code + PKCE, state, nonce, issuer discovery, and signature-validated ID Tokens. LUMEN retains its own opaque server-side sessions and role-based authorization.
+
+## Configuration (all required, feature OFF by default)
+
+OIDC_ISSUER=https://identity.university.example
+OIDC_CLIENT_ID=...
+OIDC_CLIENT_SECRET=...
+OIDC_REDIRECT_URI=https://lumen.example.edu/api/auth/oidc/callback
+OIDC_ONLY=0
+
+Register the exact callback URL at the institutional IdP. Store the secret in the deployment secret manager, never in GitHub code or PWA assets. Discovery issuer must be HTTPS. HTTP callback is permitted only for loopback tests.
+
+## Identity / privilege separation
+
+The librarian provisions an account and associates its *stable* provider subject (sub) using POST /api/staff/oidc/bind. Subjects must come from a trusted IdP administration workflow. LUMEN cannot guess or elevate identities from the email string or token groups. Login requires immutable issuer+subject binding, verified email, exact email match, and active account. No auto-provisioning. Professors and librarians retain roles assigned locally by authorized staff.
+
+GET /api/auth/oidc/start sets a one-time, 5-minute flow cookie. Callback validates state, nonce, PKCE, issuer and signed ID Token through openid-client. Only then does LUMEN issue a new opaque HttpOnly session. Callback exchanges code server-side, clears one-time cookie and returns to /me. Replay is rejected.
+
+To make local password login unavailable, set OIDC_ONLY=1 only AFTER mapping and testing at least one librarian; otherwise access may be lost. An operator-controlled rollback of the setting is the recovery path.
+
+## DoD and outstanding evidence
+
+Mock IdP domain/HTTP suite: state expiry/replay, CSRF, role non-escalation, duplicate binding, email_verified, issuer claims, active-user requirement. Real institutional staging IdP, token/signature interoperability, logout and account deprovisioning, high availability and security audit remain OPEN. This is a staged SSO pilot, not enterprise SSO certification.
