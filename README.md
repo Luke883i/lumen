@@ -5,8 +5,10 @@ LUMEN is a deployable, installable library-services PWA for patrons, faculty and
 ## Start in GitHub Codespaces
 
 1. Open this repository in a Codespace (the devcontainer uses Node 24).
-2. In the terminal run `npm install && npm run dev`.
-3. Open forwarded port **3000**. Use the seeded local demonstration accounts:
+2. If the Codespace existed before this commit, run **Codespaces: Rebuild Container** in the VS Code Command Palette (`Ctrl+Shift+P`) to apply the Node 24 devcontainer. A repository update alone cannot install Node into an already-running container.
+3. Check `node --version` and `npm --version`; both are checked by the devcontainer bootstrap.
+4. Run `npm run dev`. If `npm` is unavailable, run `bash scripts/doctor.sh`; use Rebuild Container (Full Rebuild if necessary).
+5. Open forwarded port **3000**. Use the seeded local demonstration accounts:
    - `student@lumen.local` / `Demo1234!`
    - `faculty@lumen.local` / `Demo1234!`
    - `librarian@lumen.local` / `Demo1234!`
@@ -17,7 +19,7 @@ Demonstration data is **enabled only** when `LUMEN_DEMO=1` and `NODE_ENV` is not
 
 Connect the repo to a Render Blueprint (`render.yaml`). Render provisions a Node service and a **persistent disk** (billable). Set `ADMIN_EMAIL`, `ADMIN_PASSWORD` and optionally `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. The service uses `/var/data/lumen.sqlite`; never run production on Render's ephemeral filesystem. Seed only one librarian account from `ADMIN_*` on the first start. Add books, copies and patrons from the librarian interface.
 
-`npm run start` runs the server, `npm test` runs deterministic domain/API tests, `npm run check` checks JS syntax. A health endpoint is available at `/api/health`.
+`bash scripts/bootstrap.sh` verifies the environment and installs dependencies, `npm run start` runs the server, `npm test` runs deterministic domain/API tests, `npm run check` checks JS syntax. A health endpoint is available at `/api/health`.
 
 ## Non-negotiable architectural boundaries
 
