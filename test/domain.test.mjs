@@ -209,3 +209,19 @@ test('catalogue derived cache invalidates atomically for hold, issue and return'
   assert.equal(fourth.borrowed,first.borrowed);
   s.close();
 });
+
+test('production refuses prior demo database even when accounts already exist',()=>{
+  const s=openStore(':memory:');
+  bootstrap(s,{NODE_ENV:'test',LUMEN_DEMO:'1'});
+  assert.equal(s.get("SELECT value FROM metadata WHERE key='demo_dataset'").value,'1');
+  assert.throws(()=>bootstrap(s,{NODE_ENV:'production',ADMIN_EMAIL:'admin@example.edu',ADMIN_PASSWORD:'a-very-long-secret'}),/REFUSING PRODUCTION START/);
+  assert.throws(()=>bootstrap(s,{NODE_ENV:'production',LUMEN_DEMO:'1'}),/REFUSING PRODUCTION START/);
+  s.close();
+});
+test('production accepts existing non-demo accounts without reseeding',()=>{
+  const s=openStore(':memory:');
+  bootstrap(s,{NODE_ENV:'production',ADMIN_EMAIL:'admin@example.edu',ADMIN_PASSWORD:'a-very-long-secret'});
+  bootstrap(s,{NODE_ENV:'production'});
+  assert.equal(s.get('SELECT count(*) n FROM users').n,1);
+  s.close();
+});

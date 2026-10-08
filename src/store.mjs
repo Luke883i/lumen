@@ -102,6 +102,11 @@ function addAccount(s, { email, name, role, password }) {
 }
 
 export function bootstrap(s, env = process.env) {
+  // A demo DB must never be reused on an internet-facing production service.
+  const isDemo = s.get("SELECT value FROM metadata WHERE key='demo_dataset'")?.value === '1';
+  if (env.NODE_ENV === 'production' && (isDemo || env.LUMEN_DEMO === '1')) {
+    throw new Error('REFUSING PRODUCTION START: demonstration dataset or LUMEN_DEMO enabled');
+  }
   if (s.get("SELECT count(*) as n FROM users").n > 0) return;
   if (env.NODE_ENV === 'production') {
     if (!env.ADMIN_EMAIL || !env.ADMIN_PASSWORD || env.ADMIN_PASSWORD.length < 12) {
@@ -117,6 +122,7 @@ export function bootstrap(s, env = process.env) {
     return;
   }
   s.tx(() => {
+    s.run("INSERT OR REPLACE INTO metadata(key,value) VALUES('demo_dataset','1')");
     addAccount(s, { email: 'student@lumen.local', name: 'Alex Studente', role: 'student', password: 'Demo1234!' });
     addAccount(s, { email: 'faculty@lumen.local', name: 'Giulia Docente', role: 'faculty', password: 'Demo1234!' });
     addAccount(s, { email: 'librarian@lumen.local', name: 'Sara Bibliotecaria', role: 'librarian', password: 'Demo1234!' });
