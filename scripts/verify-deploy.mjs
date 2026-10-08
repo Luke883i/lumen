@@ -15,6 +15,7 @@ gate('codespaces',container.image==='mcr.microsoft.com/devcontainers/javascript-
 gate('canonical-entrypoints',pkg.scripts.dev?.includes('src/server.mjs')&&pkg.scripts.start==='node src/server.mjs','standard npm commands');
 gate('runtime-prestart',pkg.scripts.prestart==='node scripts/preflight.mjs','preflight cannot be skipped by npm start');
 gate('render-plan',line('plan','starter')&&line('runtime','node'),'pilot single-node');
+gate('ci-gated-deploy',line('autoDeployTrigger','checksPass'),'Render must wait for commit checks');
 gate('render-build',line('buildCommand','npm ci && npm run check && npm test'),'test before deployment');
 gate('render-start',line('startCommand','npm start')&&line('healthCheckPath','/api/health'),'start + probe');
 gate('persistent-disk',line('mountPath','/var/data')&&line('sizeGB','1')&&line('value','/var/data/lumen.sqlite'),'sqlite survives deploy');

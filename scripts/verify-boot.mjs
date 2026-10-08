@@ -44,6 +44,8 @@ async function scenario(label,args,filename){
   if(home.status!==200 || !(await home.text()).includes('LUMEN'))throw Error('app shell missing');
   const manifest=await fetch(origin+'/manifest.webmanifest');
   if(manifest.status!==200 || (await manifest.json()).display!=='standalone')throw Error('manifest invalid');
+  const version=await fetch(origin+'/api/version');
+  if(version.status!==200||(await version.json()).service!=='lumen')throw Error('revision endpoint missing');
   const catalogue=await fetch(origin+'/api/books');
   if(catalogue.status!==200 || (await catalogue.json()).length<1)throw Error('catalogue missing');
   const login=await fetch(origin+'/api/login',{method:'POST',

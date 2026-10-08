@@ -5,6 +5,7 @@ services:
     runtime: node
     plan: starter
     region: frankfurt
+    autoDeployTrigger: checksPass
     buildCommand: npm ci && npm run check && npm test
     startCommand: npm start
     healthCheckPath: /api/health

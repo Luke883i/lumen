@@ -81,6 +81,11 @@ export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCircul
       const url=new URL(req.url,'http://localhost');
       const path=url.pathname,method=req.method;
       if(path==='/api/health'&&method==='GET') return respond(res,{status:'ok',db:!!database.get('SELECT 1 ok')?.ok});
+      if(path==='/api/version'&&method==='GET') return respond(res,{
+        service:'lumen',
+        revision:process.env.RENDER_GIT_COMMIT||process.env.GIT_SHA||null,
+        mode:process.env.NODE_ENV||'development'
+      });
       if(method==='GET'&&path==='/api/auth/oidc/start'){
         const start=await oidcApi.start();
         res.writeHead(302,{'Location':start.redirect,'Cache-Control':'no-store',
