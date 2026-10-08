@@ -7,7 +7,7 @@ R5 does NOT call a Koha check-in mutation API. The approved flow is:
 1. Librarian confirms physical possession of the item and identifies its Koha checkout ID.
 2. LUMEN staff screen `/staff/koha-returns` creates a locally auditable **verification ticket**, only after Koha reports a matching active checkout.
 3. Librarian completes check-in using the authoritative Koha staff circulation workflow.
-4. Librarian clicks **Verify** in LUMEN. The backend requests Koha's checked-in checkout history, with `checked_in=true`, and requires positive evidence matching **checkout ID, patron ID, item ID and check-in timestamp**.
+4. Librarian clicks **Verify** in LUMEN. The backend requests Koha's checked-in checkout history, with `checked_in=true`, and requires positive evidence matching **checkout ID, patron ID, item ID and check-in timestamp**. The date must be temporally compatible with the verification ticket (two-minute clock-skew allowance); unrelated old records or future dates are rejected.
 5. LUMEN records one atomic audit receipt with the verified Koha return date and branch. The remote Koha circulation engine alone determines copy availability and queue advancement.
 
 An absent active checkout, HTTP 404, empty checkout history, malformed or mismatched record, inaccessible Koha API, or missing date is **not proof** of a completed return. The ticket remains awaiting Koha. Repeated successful verification replays the same receipt; it does not generate another audit event.

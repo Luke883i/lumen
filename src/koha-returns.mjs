@@ -82,6 +82,11 @@ export function createKohaReturns(s,koha,config=process.env){
         checked.item_id!==ticket.item_id||typeof checked.checkin_date!=='string'||
         !Number.isFinite(Date.parse(checked.checkin_date)))
         deny(409,'KOHA_RETURN_MISMATCH','Il rientro Koha non corrisponde al prestito atteso');
+      const checkedAt=Date.parse(checked.checkin_date);
+      const openedAt=Date.parse(ticket.created_at);
+      // Allow limited clock skew, but reject unrelated historical or future dates.
+      if(checkedAt<openedAt-120000||checkedAt>Date.now()+120000)
+        deny(409,'KOHA_RETURN_TEMPORAL_MISMATCH','Data di rientro Koha incompatibile con la verifica in corso');
       return s.tx(()=>{
         requireStaff(s,staff);
         const latest=find(ticket.id);

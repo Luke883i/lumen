@@ -47,13 +47,13 @@ test('return cannot be confirmed without positive Koha history',async()=>{
   f.s.close();
 });
 test('wrong checkout owner or item does not certify a check-in',async()=>{
-  const f=fixture({async checkedInCheckout(){return {checkout_id:501,patron_id:202,item_id:81,checkin_date:'2026-10-08T12:00:00Z'};}});
+  const f=fixture({async checkedInCheckout(){return {checkout_id:501,patron_id:202,item_id:81,checkin_date:new Date().toISOString()};}});
   const ticket=await f.returns.prepare(f.staff,501,'mismatched-return-00001');
   await reject(()=>f.returns.verify(f.staff,ticket.ticketId),'KOHA_RETURN_MISMATCH');
   assert.equal(f.returns.list(f.staff).length,1);f.s.close();
 });
 test('verified checkout history yields one audited receipt and exact repeat',async()=>{
-  const f=fixture({async checkedInCheckout(){return {checkout_id:501,patron_id:101,item_id:81,checkin_date:'2026-10-08T12:00:00Z',checkin_library_id:'MAIN'};}});
+  const f=fixture({async checkedInCheckout(){return {checkout_id:501,patron_id:101,item_id:81,checkin_date:new Date().toISOString(),checkin_library_id:'MAIN'};}});
   const ticket=await f.returns.prepare(f.staff,501,'verified-return-key-001');
   const done=await f.returns.verify(f.staff,ticket.ticketId);
   assert.equal(done.state,'verified');
@@ -70,7 +70,7 @@ test('verified checkout history yields one audited receipt and exact repeat',asy
 test('stale staff authority is denied after awaiting Koha',async()=>{
   const f=fixture({async checkedInCheckout(){
     f.s.run('UPDATE users SET active=0 WHERE id=?',f.staff.id);
-    return {checkout_id:501,patron_id:101,item_id:81,checkin_date:'2026-10-08T12:00:00Z'};
+    return {checkout_id:501,patron_id:101,item_id:81,checkin_date:new Date().toISOString()};
   }});
   const ticket=await f.returns.prepare(f.staff,501,'stale-authority-key-001');
   await reject(()=>f.returns.verify(f.staff,ticket.ticketId),'FORBIDDEN');
@@ -88,7 +88,7 @@ test('Koha completed-checkout lookup supports pagination with exact patron, copy
     assert.equal(opts.redirect,'error');
     const page=Number(u.searchParams.get('_page'));
     const rows=page===1?Array.from({length:100},(_,j)=>({checkout_id:j+1,patron_id:101,item_id:j+1,checkin_date:'2026-10-01T00:00:00Z'}))
-      :[{checkout_id:501,patron_id:101,item_id:81,checkin_date:'2026-10-08T12:00:00Z',checkin_library_id:'MAIN'}];
+      :[{checkout_id:501,patron_id:101,item_id:81,checkin_date:new Date().toISOString(),checkin_library_id:'MAIN'}];
     return Response.json(rows);
   };
   const k=makeKoha({NODE_ENV:'test',KOHA_BASE_URL:'http://127.0.0.1:9999',KOHA_CLIENT_ID:'x',KOHA_CLIENT_SECRET:'y'},transport);
@@ -103,4 +103,17 @@ test('Koha historical 404 or missing checkin date never implies a completed retu
   };
   const koha=makeKoha({NODE_ENV:'test',KOHA_BASE_URL:'http://127.0.0.1:9999',KOHA_CLIENT_ID:'x',KOHA_CLIENT_SECRET:'y'},mock);
   await reject(()=>koha.checkedInCheckout({patronId:101,checkoutId:501,itemId:81}),'KOHA_HTTP_404');
+});
+
+test('historical or future check-in timestamps cannot promote a newer ticket',async()=>{
+  for(const offset of [-86400000,86400000]){
+    const f=fixture({async checkedInCheckout(){
+      return {checkout_id:501,patron_id:101,item_id:81,checkin_date:new Date(Date.now()+offset).toISOString()};
+    }});
+    const ticket=await f.returns.prepare(f.staff,501,'temporal-validation-key-001');
+    await reject(()=>f.returns.verify(f.staff,ticket.ticketId),'KOHA_RETURN_TEMPORAL_MISMATCH');
+    assert.equal(f.returns.list(f.staff).length,1);
+    assert.equal(f.s.get("SELECT count(*) n FROM audit_events WHERE operation='koha_return_verified'").n,0);
+    f.s.close();
+  }
 });

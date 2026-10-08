@@ -18,7 +18,7 @@ async function fixture(fn){
   const koha={configured:true,
     async checkout(id){return {checkout_id:id,patron_id:101,item_id:81,checkin_date:null};},
     async checkedInCheckout(){historyCalls++;return checked?{
-      checkout_id:501,patron_id:101,item_id:81,checkin_date:'2026-10-08T11:40:00Z',checkin_library_id:'MAIN'
+      checkout_id:501,patron_id:101,item_id:81,checkin_date:new Date().toISOString(),checkin_library_id:'MAIN'
     }:null;}
   };
   const ret=createKohaReturns(s,koha,{KOHA_CIRCULATION_ENABLED:'1',KOHA_LOANS_ENABLED:'1',KOHA_RETURNS_ENABLED:'1'});
