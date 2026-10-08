@@ -27,3 +27,9 @@ These tests cannot prove Android launcher installation, Chrome OS permission del
 - `beforeinstallprompt` is simulated **only** to test fallback messaging and CTA state, not to assert OS installation.
 - Real push permission and VAPID delivery are **external blockers**. The suite proves that unconfigured push does not solicit permission.
 - Failure includes test traces; no credentials, cookies or patron metadata from production are introduced.
+
+## UX-S1 receipt-truth regression
+
+Browser assertions now compare the hold creation HTTP **201** response's `ready`/`queued` status with the actual LUMEN confirmation shown to the end user; no test hardcodes generic success. Desktop and Android-emulated Playwright projects each boot a separate in-memory database, so an assertion failure cannot contaminate the other platform's reservation lifecycle. The standalone book-detail screen also asserts the unambiguous **Invia prenotazione** CTA and excludes the misleading "Disponibilità in attesa" label. The independently reviewed business-language contract is in [UX_COPY_AUDIT.md](../docs/UX_COPY_AUDIT.md).
+
+A successful browser run is still not evidence of an Android OS launcher installation or a production Render/Koha/IdP deployment.
