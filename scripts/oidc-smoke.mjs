@@ -5,8 +5,8 @@ const report={gate:'OIDC_PROVIDER_METADATA',revision:process.env.GIT_SHA||'unbou
 try{
  const env=oidcConfiguration(process.env);
  if(!env.enabled)throw Error('OIDC_NOT_CONFIGURED');
- const auth=env.tokenAuth==='client_secret_basic'?oidc.ClientSecretBasic(env.clientSecret):undefined;
- const config=await oidc.discovery(new URL(env.issuer),env.clientId,env.clientSecret,auth);
+ const clientAuthentication=env.tokenAuth==='client_secret_basic'?oidc.ClientSecretBasic(env.clientSecret):undefined;
+ const config=await oidc.discovery(new URL(env.issuer),env.clientId,env.clientSecret,clientAuthentication);
  const meta=config.serverMetadata();
  const actual=meta.issuer;
  const auth=new URL(meta.authorization_endpoint);
