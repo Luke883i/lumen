@@ -18,10 +18,5 @@
       ]
     }
   },
-  "postStartCommand": "bash scripts/doctor.sh",
-  "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "24"
-    }
-  }
+  "postStartCommand": "bash scripts/doctor.sh"
 }
