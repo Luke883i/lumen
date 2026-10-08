@@ -85,3 +85,17 @@ test('orphan pruning is idempotent and leaves an active device intact',()=>{
   assert.equal(f.s.get('SELECT count(*) n FROM subscriptions').n,0);
  }finally{f.s.close();}
 });
+
+test('login flood cannot grow in-process rate-limit state without bound',async()=>{
+ const {registerLoginAttempt}=await import('../src/security.mjs');
+ const map=new Map();
+ for(let i=0;i<100000;i++){
+  assert.equal(registerLoginAttempt(map,'ip:'+i,1000,{maxEntries:1024}),1);
+  assert.ok(map.size<=1024);
+ }
+ assert.equal(map.size,1024);
+ assert.equal(registerLoginAttempt(map,'stable',1000,{maxEntries:1024}),1);
+ for(let i=2;i<=12;i++)assert.equal(registerLoginAttempt(map,'stable',1000,{maxEntries:1024}),i);
+ assert.equal(registerLoginAttempt(map,'stable',1000,{maxEntries:1024}),13);
+ assert.equal(registerLoginAttempt(map,'stable',1000000,{maxEntries:1024}),1);
+});

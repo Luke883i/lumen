@@ -19,3 +19,19 @@ export function pruneRevokedPush(s){
   // exists; explicit session revocation always cuts off provider delivery.
   return s.run('DELETE FROM subscriptions WHERE session_hash NOT IN (SELECT token_hash FROM sessions)').changes;
 }
+
+/** Bounded per-process throttle state. Never treat this as a distributed WAF. */
+export function registerLoginAttempt(hits,key,at,{windowMs=900000,maxEntries=20000}={}){
+  if(!(hits instanceof Map)||typeof key!=='string'||!Number.isFinite(at)||
+     !Number.isSafeInteger(maxEntries)||maxEntries<1)throw Error('LOGIN_LIMIT_CONFIGURATION');
+  const previous=hits.get(key);
+  if(previous&&at-previous.from>=0&&at-previous.from<=windowMs){
+    previous.n++;
+    return previous.n;
+  }
+  // Reinsert fresh entries so eviction order is deterministic and bounded.
+  hits.delete(key);
+  if(hits.size>=maxEntries)hits.delete(hits.keys().next().value);
+  hits.set(key,{from:at,n:1});
+  return 1;
+}

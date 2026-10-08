@@ -9,7 +9,7 @@ import { createKohaCirculation } from './koha-circulation.mjs';
 import { createKohaLoans } from './koha-loans.mjs';
 import { createKohaReturns } from './koha-returns.mjs';
 import { createOidc } from './oidc.mjs';
-import {trustedOrigin} from './security.mjs';
+import {trustedOrigin,registerLoginAttempt} from './security.mjs';
 
 const s=openStore(process.env.LUMEN_DB_PATH || './data/lumen.sqlite');
 bootstrap(s);
@@ -46,12 +46,8 @@ const readJson=async req=>{
 const loginHits=new Map();
 function loginLimit(req,email) {
   const key=String(req.socket.remoteAddress||'unknown')+':'+String(email||'').toLowerCase().slice(0,254);
-  const current=Date.now();
-  const hit=loginHits.get(key)||{from:current,n:0};
-  if(current-hit.from>900000){hit.from=current;hit.n=0;}
-  hit.n++;loginHits.set(key,hit);
-  if(hit.n>12) throw new Failure(429,'RATE_LIMIT','Troppi tentativi: riprova più tardi');
-  if(loginHits.size>20000) for(const [k,v] of loginHits) if(current-v.from>900000) loginHits.delete(k);
+  const attempts=registerLoginAttempt(loginHits,key,Date.now());
+  if(attempts>12)throw new Failure(429,'RATE_LIMIT','Troppi tentativi: riprova più tardi');
 }
 function requireCsrf(req,user) {
   if(!user) throw new Failure(401,'AUTH_REQUIRED','Effettua l’accesso');
