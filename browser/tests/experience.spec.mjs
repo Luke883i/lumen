@@ -159,3 +159,35 @@ test('standalone title detail uses truthful availability and one clear hold CTA'
   await expect(page.getByRole('main')).not.toContainText('Disponibilità in attesa');
   await expect(page.getByRole('main')).not.toContainText('Richiedi / prenota');
 });
+
+test('UX-S2 catalog projection displays only source-backed local availability',async({page})=>{
+  const response=await page.request.get('/api/books');
+  expect(response.ok()).toBeTruthy();
+  const books=await response.json();
+  expect(books.length).toBeGreaterThan(0);
+  await page.goto('/catalogo');
+  const first=page.locator('.book-card').first();
+  await expect(first).toBeVisible();
+  const available=books[0].available;
+  const label=Number.isSafeInteger(available)&&available>=0?
+    (available===0?'Nessuna copia disponibile ora':available===1?'1 copia disponibile':available+' copie disponibili'):
+    'Disponibilità da verificare';
+  await expect(first).toContainText(label);
+  await first.locator('a[data-nav]').first().click();
+  await expect(page.getByRole('main')).toContainText(label);
+  await expect(page.getByRole('main')).toContainText('la prenotazione non equivale a un prestito');
+});
+
+test('UX-S2 faculty proposal is labelled in evaluation, never presented as purchased',async({page})=>{
+  await signIn(page,'faculty');
+  await page.goto('/acquisti');
+  const form=page.locator('form[data-form="suggest"]');
+  await form.locator('input[name="title"]').fill('Validazione proiezioni non autorevoli');
+  await form.locator('input[name="author"]').fill('Biblioteca test');
+  await form.locator('textarea[name="reason"]').fill('Verifica dello stato di valutazione proposta');
+  await form.locator('button[type="submit"]').click();
+  const entry=page.locator('.card').filter({hasText:'Validazione proiezioni non autorevoli'}).first();
+  await expect(entry).toContainText('In valutazione');
+  await expect(entry).toContainText('non è un ordine');
+  await expect(entry).not.toContainText('acquistato');
+});
