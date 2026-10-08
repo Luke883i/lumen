@@ -33,3 +33,7 @@ LUMEN records a `reserved` attempt **before** issuing a Koha write. Successful 2
 - K5: OIDC, high-availability, security review, disaster recovery and production-equivalent 2,000 user soak.
 
 API contracts: https://api.koha-community.org/25.11.html . No full enterprise certification is implied by mock tests.
+
+## Staff reconciliation (implemented)
+
+The librarian's `/staff/koha-pending` screen accepts an actual Koha hold ID. `POST /api/staff/koha/reconcile` fetches `GET /api/v1/holds/{hold_id}`, validates the active hold's patron and title against the stored pending attempt, and atomically records an audited receipt. Only positive reconciliation is supported; ambiguous operations with no verified hold remain blocked. This is deliberately fail-closed.

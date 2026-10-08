@@ -57,7 +57,7 @@ test('Koha hold is received from Koha only, a replay does not reissue POST, loca
 test('network loss after POST leaves durable uncertainty, never blindly replays',async()=>{
   const f=fixture({async placeHold(){throw Object.assign(new Error('timeout'),{code:'KOHA_NETWORK'});}});
   await f.c.bind(f.staff,f.student.id,101);
-  await fail(()=>f.c.placeHold(f.student,125,'retry-no-post-000001'),'KOHA_NETWORK');
+  await fail(()=>f.c.placeHold(f.student,125,'retry-no-post-000001'),'KOHA_RECONCILIATION_REQUIRED');
   assert.equal(f.s.get('SELECT state FROM koha_hold_attempts').state,'uncertain');
   await fail(()=>f.c.placeHold(f.student,125,'retry-no-post-000001'),'KOHA_RECONCILIATION_REQUIRED');
   await fail(()=>f.c.placeHold(f.student,125,'another-request-00001'),'KOHA_RECONCILIATION_REQUIRED');
@@ -76,7 +76,7 @@ test('preflight existing hold blocks write and marks definite reject',async()=>{
 test('Koha 5xx is uncertain and access to pending is restricted',async()=>{
   const f=fixture({async placeHold(){throw Object.assign(new Error('koha 503'),{code:'KOHA_HTTP_503'});}});
   await f.c.bind(f.staff,f.student.id,101);
-  await fail(()=>f.c.placeHold(f.student,125,'uncertain-503-0000001'),'KOHA_HTTP_503');
+  await fail(()=>f.c.placeHold(f.student,125,'uncertain-503-0000001'),'KOHA_RECONCILIATION_REQUIRED');
   assert.equal(f.s.get('SELECT state FROM koha_hold_attempts').state,'uncertain');
   assert.throws(()=>f.c.pending(f.student),e=>e.code==='FORBIDDEN');
   f.s.close();
@@ -111,4 +111,35 @@ test('Koha transport POST uses typed JSON body, OAuth2 and no redirects',async()
   const post=sent.find(x=>x.url.endsWith('/api/v1/holds')&&x.opts.method==='POST');
   assert.deepEqual(JSON.parse(post.opts.body),{patron_id:101,biblio_id:125,pickup_library_id:'MAIN'});
   assert.ok(sent.every(x=>x.opts.redirect==='error'));
+});
+
+test('manual reconciliation verifies remote receipt and exact replay',async()=>{
+ const f=fixture({
+  async placeHold(){throw Object.assign(new Error('timeout'),{code:'KOHA_NETWORK'});},
+  async hold(id){return {hold_id:id,patron_id:101,biblio_id:125,priority:2,cancellation_date:null};}
+ });
+ await f.c.bind(f.staff,f.student.id,101);
+ const key='reconcile-result-12345';
+ await fail(()=>f.c.placeHold(f.student,125,key),'KOHA_RECONCILIATION_REQUIRED');
+ const attempt=f.c.pending(f.staff)[0];
+ await fail(()=>f.c.reconcile(f.student,attempt.id,900),'FORBIDDEN');
+ const receipt=await f.c.reconcile(f.staff,attempt.id,900);
+ assert.equal(receipt.holdId,900);
+ assert.equal(receipt.reconciled,true);
+ assert.deepEqual(await f.c.placeHold(f.student,125,key),receipt);
+ assert.equal(f.s.get("SELECT count(*) n FROM audit_events WHERE operation='koha_hold_reconciled'").n,1);
+ assert.equal(f.c.pending(f.staff).length,0);
+ await fail(()=>f.c.reconcile(f.staff,attempt.id,900),'KOHA_INVALID_STATE');
+ f.s.close();
+});
+test('wrong Koha patron cannot be used as reconciliation evidence',async()=>{
+ const f=fixture({
+  async placeHold(){throw Object.assign(new Error('timeout'),{code:'KOHA_NETWORK'});},
+  async hold(id){return {hold_id:id,patron_id:202,biblio_id:125,priority:3,cancellation_date:null};}
+ });
+ await f.c.bind(f.staff,f.student.id,101);
+ await fail(()=>f.c.placeHold(f.student,125,'mismatch-resolution-key'),'KOHA_RECONCILIATION_REQUIRED');
+ await fail(()=>f.c.reconcile(f.staff,f.c.pending(f.staff)[0].id,777),'KOHA_RECEIPT_MISMATCH');
+ assert.equal(f.c.pending(f.staff).length,1);
+ f.s.close();
 });

@@ -10,7 +10,7 @@
     "dev": "LUMEN_DEMO=1 NODE_ENV=development node --watch src/server.mjs",
     "start": "node src/server.mjs",
     "test": "node --test test/*.test.mjs",
-    "check": "node --check src/server.mjs && node --check src/store.mjs && node --check src/service.mjs && node --check public/app.js && node --check public/sw.js && node --check src/koha.mjs && node --check src/backup.mjs && node --check perf/library.k6.js",
+    "check": "node --check src/server.mjs && node --check src/store.mjs && node --check src/service.mjs && node --check public/app.js && node --check public/sw.js && node --check src/koha.mjs && node --check src/backup.mjs && node --check perf/library.k6.js && node --check src/koha-circulation.mjs",
     "backup": "node src/backup.mjs",
     "preflight": "node scripts/preflight.mjs"
   },
