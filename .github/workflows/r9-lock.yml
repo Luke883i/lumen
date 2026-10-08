@@ -1,0 +1,27 @@
+name: R9 dependency lock resolver (temporary)
+on:
+  push:
+    branches: [feat/lumen-r9-browser-e2e]
+    paths:
+      - 'browser/package.json'
+      - '.github/workflows/r9-lock.yml'
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Resolve locked browser-only packages
+        run: npm --prefix browser install --package-lock-only --ignore-scripts
+      - name: Attach generated lock to PR #9 for semantic commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo 'R9_LOCK_BEGIN'; cat browser/package-lock.json; echo 'R9_LOCK_END'; } > /tmp/browser-lock-pr.txt
+          gh pr comment 9 --body-file /tmp/browser-lock-pr.txt
