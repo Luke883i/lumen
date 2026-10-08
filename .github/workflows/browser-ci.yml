@@ -19,6 +19,7 @@ on:
       - '.github/workflows/browser-ci.yml'
 permissions:
   contents: read
+  pull-requests: write
 jobs:
   chromium:
     runs-on: ubuntu-latest
@@ -36,7 +37,16 @@ jobs:
       - name: Install pinned Chromium and Linux libraries
         run: npm --prefix browser exec -- playwright install --with-deps chromium
       - name: Actual desktop and Android-emulated browser journeys
-        run: npm run test:browser
+        run: |
+          set -o pipefail
+          npm run test:browser 2>&1 | tee /tmp/lumen-browser-acceptance.log
+      - name: Expose falsification diagnostics in PR #9
+        if: failure() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { echo '### R9 real-browser falsification · ${{ github.sha }}'; echo '~~~text'; tail -n 110 /tmp/lumen-browser-acceptance.log 2>/dev/null || true; echo '~~~'; } > /tmp/r9-diagnostics.md
+          gh pr comment 9 --body-file /tmp/r9-diagnostics.md
       - name: Save failing browser trace and screenshot evidence
         if: failure()
         uses: actions/upload-artifact@v4
