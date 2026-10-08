@@ -1,5 +1,6 @@
 import {roleNavigation,activeNavigation,taskLinks,staffAreaFromSearch,STAFF_AREAS} from './navigation.js';
 import {createInboxWatcher} from './notification-watch.js';
+import {createRenderEpoch,mutationFailure,beginAction,afterAction} from './interaction.js';
 import {libraryCopy,installExperience,pushExperience,actionConfirmation,localHoldResult,localStatus,localActionFeedback,localClickFeedback} from './experience.js';
 import {projectLocalBook,projectKohaBook,projectLocalHold,projectLocalLoan,projectAcquisition,projectNotification,projectPatron,projectKohaOperation} from './projections.js';
 const root=document.querySelector('#root');
@@ -8,6 +9,7 @@ const inboxWatcher=createInboxWatcher();
 const dialog=document.querySelector('#lumen-dialog');
 const state={user:null,csrf:null,install:null,koha:false,kohaWrite:false,kohaLoans:false,kohaReturns:false,oidcEnabled:false,oidcOnly:false};
 const retryKeys=new Map();
+const renderEpoch=createRenderEpoch();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=s=>esc(s);
 const bookIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7c-3-3-7-3-10-2v14c3-1 7-1 10 2m0-14c3-3 7-3 10-2v14c-3-1-7-1-10 2M12 7v14"/></svg>';
@@ -46,10 +48,15 @@ async function api(path,method='GET',body) {
   }
   let r;
   try{r=await fetch(path,options);}
-  catch{throw new Error('Servizio non raggiungibile. Riprova quando sei online.');}
-  const data=await r.json();
-  if(signature) retryKeys.delete(signature);
-  if(!r.ok) throw new Error(data.error?.message||'Operazione non riuscita');
+  catch{throw new Error(mutationFailure({method,transport:'network'}).message);}
+  let data;
+  try{data=await r.json();}
+  catch{throw new Error(mutationFailure({method,transport:'invalid_response'}).message);}
+  // Preserve the same idempotency key after an uncertain write outcome.
+  if(signature&&r.status<500)retryKeys.delete(signature);
+  if(!r.ok)throw new Error((method!=='GET'&&r.status>=500
+    ?mutationFailure({method,status:r.status,transport:'http'}).message
+    :data.error?.message)||'Operazione non riuscita');
   return data;
 }
 // Foreground notification UX is an optional read of the server-owned inbox.
@@ -83,8 +90,23 @@ function message(text,bad=false) {
 }
 function navigate(to) {
   history.pushState({},'',to);
-  render().then(()=>document.querySelector('#main')?.focus({preventScroll:true}));
+  void render().then(committed=>{if(committed)document.querySelector('#main')?.focus({preventScroll:true});});
   window.scrollTo({top:0,behavior:'instant'});
+}
+function showActionResult(kind,content){
+  const action=afterAction[kind],main=document.querySelector('#main');
+  if(!action||!main)return;
+  const existing=main.querySelector('.action-outcome');
+  if(existing)existing.remove();
+  const region=document.createElement('section');
+  region.className='action-outcome';region.setAttribute('role','region');
+  region.setAttribute('aria-label','Esito dell’operazione');
+  const detail=document.createElement('p');detail.textContent=content;
+  const next=document.createElement('a');next.href=action.href;next.dataset.nav='';
+  next.textContent=action.label;next.className='btn alt small';
+  region.append(detail,next);
+  const heading=main.querySelector('.page-top');
+  if(heading)heading.after(region);else main.prepend(region);
 }
 const installModel=()=>installExperience({
   standalone:matchMedia('(display-mode: standalone)').matches||navigator.standalone===true,
@@ -369,16 +391,20 @@ async function view(){
   return sectionTitle('Pagina non trovata','Controlla il percorso o torna al catalogo.');
 }
 async function render(){
-  root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1"><div class="empty">Caricamento…</div></main>'+footer();
+  const ticket=renderEpoch.begin(),route=location.pathname+location.search;
+  root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1"><div class="empty" role="status">Caricamento…</div></main>'+footer();
+  const current=()=>renderEpoch.latest(ticket)&&route===location.pathname+location.search;
   try{
     const markup=await view();
+    if(!current())return false;
     root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1">'+markup+'</main>'+footer();
-    // Install buttons are state-derived, never shown when Chrome has no prompt.
     document.title='LUMEN · '+(location.pathname==='/'?'La tua biblioteca':location.pathname.split('/')[1]);
     paintUnreadCount();
   }catch(e){
+    if(!current())return false;
     root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1">'+sectionTitle('Servizio temporaneamente non disponibile',e.message)+'<a data-nav class="btn" href="/">Torna alla home</a></main>'+footer();
   }
+  return true;
 }
 document.addEventListener('click',async event=>{
   const a=event.target.closest('a[data-nav]');
@@ -386,7 +412,8 @@ document.addEventListener('click',async event=>{
   const b=event.target.closest('[data-click]');
   if(!b)return;
   const action=b.dataset.click,id=b.dataset.id;
-  b.disabled=true;
+  const finish=beginAction(b,{label:'Attendi…'});
+  if(!finish)return;
   try{
     if(action==='logout'){
       // Server logout first revokes every push binding of this session.
@@ -396,7 +423,7 @@ document.addEventListener('click',async event=>{
       navigate('/');message('Sessione terminata');return;
     }
     if(['cancel-hold','return','disable'].includes(action)){
-      if(!await confirmation(action,b)){b.disabled=false;return;}
+      if(!await confirmation(action,b)){finish();b.focus();return;}
     }
     if(action==='cancel-hold')await api('/api/holds/'+encodeURIComponent(id)+'/cancel','POST');
     if(action==='renew')await api('/api/loans/'+encodeURIComponent(id)+'/renew','POST');
@@ -420,13 +447,16 @@ document.addEventListener('click',async event=>{
     if(action==='disable-push'){await disablePush();message('Notifiche disattivate su questo dispositivo');await render();return;}
     if(action==='reset-push'){await clearLocalPush();message('Dispositivo ripristinato. Puoi attivare le notifiche per questo account.');await render();return;}
     message(localClickFeedback(action)||'Esito da verificare nella pagina corrente.',!localClickFeedback(action));await render();
-  }catch(e){message(e.message,true);b.disabled=false;}
+  }catch(e){message(e.message,true);}
+  finally{finish();}
 });
 document.addEventListener('submit',async event=>{
   const form=event.target.closest('[data-form]');if(!form)return;
   event.preventDefault();const action=form.dataset.form;
   const data=Object.fromEntries(new FormData(form));
-  const submit=form.querySelector('button[type="submit"]');if(submit)submit.disabled=true;
+  const submit=form.querySelector('button[type="submit"]');
+  const finish=submit?beginAction(submit,{label:action==='search'||action==='koha-search'?'Ricerca…':'Invio…'}):null;
+  if(submit&&!finish)return;
   try{
     if(action==='search'){navigate('/catalogo?q='+encodeURIComponent(data.query||''));return;}
     if(action==='koha-search'){navigate('/koha?q='+encodeURIComponent(data.query||''));return;}
@@ -478,8 +508,18 @@ document.addEventListener('submit',async event=>{
     }
     if(action==='change-password'){await api('/api/change-password','POST',data);state.user=null;state.csrf=null;navigate('/accedi');message('Password aggiornata. Effettua nuovamente l’accesso.');return;}
     if(action==='login'){const r=await api('/api/login','POST',data);state.user=r.user;state.csrf=r.csrf;inboxWatcher.reset();unreadCount=0;navigate(r.user.role==='librarian'?'/staff':'/me');void refreshInbox();message('Accesso effettuato');return;}
-    if(action==='hold'){const receipt=await api('/api/holds','POST',data);const result=localHoldResult(receipt);message(result.message,result.epistemic==='unknown');await render();return;}
-    if(action==='suggest'){const receipt=await api('/api/suggestions','POST',data);message(receipt?.status==='pending'?'Proposta inviata alla biblioteca per la valutazione.':'Esito della proposta da verificare.',receipt?.status!=='pending');await render();return;}
+    if(action==='hold'){
+      const receipt=await api('/api/holds','POST',data),result=localHoldResult(receipt);
+      await render();
+      if(location.pathname.startsWith('/catalogo/'))showActionResult('hold',result.message);
+      message(result.message,result.epistemic==='unknown');return;
+    }
+    if(action==='suggest'){
+      const receipt=await api('/api/suggestions','POST',data);
+      const summary=receipt?.status==='pending'?'Proposta inviata alla biblioteca per la valutazione.':'Esito della proposta da verificare.';
+      await render();if(location.pathname==='/acquisti')showActionResult('suggest',summary);
+      message(summary,receipt?.status!=='pending');return;
+    }
     if(action==='book'){data.copies=Number(data.copies);await api('/api/staff/books','POST',data);}
     if(action==='user')await api('/api/staff/users','POST',data);
     if(action==='checkout')await api('/api/staff/checkout','POST',data);
@@ -489,7 +529,8 @@ document.addEventListener('submit',async event=>{
       await render();return;
     }
     message(localActionFeedback(action)||'Esito da verificare nella pagina corrente.',!localActionFeedback(action));await render();
-  }catch(e){message(e.message,true);if(submit)submit.disabled=false;}
+  }catch(e){message(e.message,true);}
+  finally{finish?.();}
 });
 async function enablePush(){
   if(!window.isSecureContext||!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))
@@ -524,7 +565,7 @@ async function disablePush(){
   await api('/api/push-subscription','DELETE',{endpoint:subscription.endpoint});
   await clearLocalPush();
 }
-window.addEventListener('popstate',render);
+window.addEventListener('popstate',()=>{void render().then(ok=>{if(ok)document.querySelector('#main')?.focus({preventScroll:true});});});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.install=e;if(location.pathname==='/installazione')render();});
 window.addEventListener('appinstalled',()=>{state.install=null;if(location.pathname==='/installazione')render();message('LUMEN installata sul dispositivo');});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));

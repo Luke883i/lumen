@@ -1,6 +1,6 @@
 // LUMEN offline shell and privacy-safe system notifications.
 const CACHE='lumen-static-v4';
-const ASSETS=['/','/style.css','/app.js','/experience.js','/notification-watch.js','/projections.js','/manifest.webmanifest',
+const ASSETS=['/','/style.css','/app.js','/experience.js','/interaction.js','/notification-watch.js','/projections.js','/manifest.webmanifest',
   '/icons/lumen.svg','/icons/icon-192.png','/icons/icon-512.png'];
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())

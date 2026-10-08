@@ -111,3 +111,7 @@ Side-effect-free role/route selectors, ≤5 mobile primary links, separate Koha 
 ## PR #14 E2E operational wiring
 
 Staff reservations are now a paged, staff-authorized read model for queued/ready holds; staff notifications are transactionally emitted by the hold creation. Foreground inbox badges/toasts derive from /api/notifications; OS push needs VAPID/HTTPS/permission/subscription and remains unproven on a physical device. Test suites must be green on the final exact SHA. See [E2E_REQUESTS_NOTIFICATIONS.md](E2E_REQUESTS_NOTIFICATIONS.md).
+
+## UX-S5 — CTA outcome truth and keyboard interaction (PR #16)
+
+A new presentation-only interaction module serializes live screen rendering with an epoch, gates duplicate UI submissions and distinguishes ordinary GET reachability failures from ambiguous POST/PUT/PATCH/DELETE outcomes. Confirmed hold/proposal mutations show concise persistent next-step navigation. `npm run dev` and Render `npm start` are unchanged. Gate: pure state tests plus Playwright against real LUMEN, including a stalled GET arriving late, a stalled POST attempted twice, an interrupted write and Escape/focus from native dialog. Physical device, Koha/IdP interoperability and enterprise capacity remain blocked.
