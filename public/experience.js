@@ -2,7 +2,7 @@
 export const libraryCopy=Object.freeze({
   title:'LUMEN · La tua biblioteca',
   promise:'Una porta semplice al patrimonio e ai servizi della tua biblioteca.',
-  services:'Cerca nel catalogo, richiedi un libro, consulta i prestiti e segui le comunicazioni.',
+  services:'Cerca nel catalogo, invia prenotazioni, consulta prestiti e segui gli avvisi.',
   context:'La biblioteca mette a disposizione catalogo, prestiti, prenotazioni e supporto alla didattica e alla ricerca. Sedi, orari e regole sono comunicati dalla biblioteca.',
   roles:Object.freeze({
     student:'Studente · Ricerca, prenotazioni, prestiti e avvisi.',
@@ -33,4 +33,15 @@ export function actionConfirmation(action){
     return:{title:'Confermare la restituzione?',detail:'Verifica di avere ricevuto fisicamente la copia prima di registrare il rientro.',confirm:'Conferma restituzione',danger:false}
   };
   return copy[action]||null;
+}
+
+export function localAvailability(n){
+ if(!Number.isSafeInteger(n)||n<0)return {status:'unknown',source:'lumen',epistemic:'unknown',label:'Disponibilità da verificare'};
+ if(n===0)return {status:'unavailable',source:'lumen',epistemic:'supported',label:'Nessuna copia disponibile ora'};
+ return {status:'available',source:'lumen',epistemic:'supported',label:n===1?'1 copia disponibile':n+' copie disponibili'};
+}
+export function localHoldResult(receipt){
+ if(receipt?.status==='ready')return {status:'ready',epistemic:'supported',message:'Prenotazione pronta per il ritiro. Consulta la tua area.'};
+ if(receipt?.status==='queued')return {status:'queued',epistemic:'supported',message:'Prenotazione in coda. Segui gli aggiornamenti nella tua area.'};
+ return {status:'unknown',epistemic:'unknown',message:'Esito da verificare. Controlla la tua area prima di riprovare.'};
 }
