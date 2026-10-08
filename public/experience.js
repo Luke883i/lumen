@@ -66,3 +66,19 @@ export function localActionFeedback(action){
  };
  return messages[action]||null;
 }
+
+/** Feedback is displayed only after the matching standalone API succeeds. */
+export function localClickFeedback(action){
+ const messages={
+  'cancel-hold':'Prenotazione annullata.',
+  renew:'Prestito rinnovato nel catalogo LUMEN.',
+  return:'Restituzione registrata nel catalogo LUMEN.',
+  disable:'Account disabilitato. Accessi revocati.',
+  'issue-ready':'Prestito registrato nel catalogo LUMEN.',
+  approve:'Proposta approvata.',
+  reject:'Proposta non accolta.',
+  ordered:'Proposta segnata come ordinata.',
+  read:'Comunicazione segnata come letta.'
+ };
+ return messages[action]||null;
+}

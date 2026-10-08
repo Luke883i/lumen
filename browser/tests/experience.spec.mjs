@@ -58,8 +58,14 @@ test('student login, hold lifecycle and LUMEN dialog cancel/confirm are browser-
   await expect(page.locator('.book-card').first()).toBeVisible();
   await page.locator('.book-card').first().locator('a[data-nav]').first().click();
   await expect(page.locator('form[data-form="hold"]')).toBeVisible();
+  const receiptPromise=page.waitForResponse(r=>r.url().endsWith('/api/holds')&&r.request().method()==='POST');
   await page.locator('form[data-form="hold"] button[type="submit"]').click();
-  await expect(page.locator('#toast')).toContainText('Operazione registrata');
+  const response=await receiptPromise;
+  expect(response.status()).toBe(200);
+  const receipt=await response.json();
+  expect(['queued','ready']).toContain(receipt.status);
+  await expect(page.locator('#toast')).toContainText(receipt.status==='ready'?
+    'Prenotazione pronta per il ritiro':'Prenotazione in coda');
   await page.goto('/me');
   const cancel=page.locator('[data-click="cancel-hold"]').first();
   await expect(cancel).toBeVisible();
@@ -142,4 +148,14 @@ test('student cannot open faculty acquisition UI or access librarian APIs',async
   await expect(page.locator('form[data-form="broadcast"]')).toHaveCount(0);
   const response=await page.request.get('/api/staff/stats');
   expect(response.status()).toBe(403);
+});
+
+test('standalone title detail uses truthful availability and one clear hold CTA',async({page})=>{
+  await signIn(page,'student');
+  await page.goto('/catalogo');
+  await page.locator('.book-card a[data-nav]').first().click();
+  await expect(page.getByRole('heading',{name:'Prenota il titolo'})).toBeVisible();
+  await expect(page.locator('form[data-form="hold"] button[type="submit"]')).toHaveText('Invia prenotazione');
+  await expect(page.getByRole('main')).not.toContainText('Disponibilità in attesa');
+  await expect(page.getByRole('main')).not.toContainText('Richiedi / prenota');
 });

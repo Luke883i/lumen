@@ -132,3 +132,33 @@ test('hold receipt disambiguates ready vs queued vs unverified',async()=>{
  for(const v of [null,undefined,{}, {status:'pending'}])
    assert.equal(localHoldResult(v).epistemic,'unknown');
 });
+
+test('local statuses never label unsupported backend values as confirmed',async()=>{
+ const {localStatus}=await import('../public/experience.js');
+ const states={
+   hold:{queued:'In coda',ready:'Pronto al ritiro',fulfilled:'Consegnata',cancelled:'Annullata'},
+   loan:{active:'In prestito',returned:'Restituito'},
+   suggestion:{pending:'In valutazione',approved:'Approvata',rejected:'Non accolta',ordered:'Ordinata'}
+ };
+ for(const [domain,values] of Object.entries(states)){
+   for(const [status,label] of Object.entries(values)){
+     const projection=localStatus(domain,status);
+     assert.equal(projection.label,label);
+     assert.equal(projection.epistemic,'supported');
+   }
+   for(const value of [null,undefined,'other','','approved-later']){
+     assert.equal(localStatus(domain,value).label,'Stato da verificare');
+     assert.equal(localStatus(domain,value).epistemic,'unknown');
+   }
+ }
+ assert.equal(localStatus('koha','active').epistemic,'unknown');
+});
+test('local action text does not imply remote push delivery or an unperformed loan',async()=>{
+ const {localActionFeedback}=await import('../public/experience.js');
+ assert.match(localActionFeedback('book'),/catalogo LUMEN/);
+ assert.match(localActionFeedback('checkout'),/Prestito registrato/);
+ assert.match(localActionFeedback('broadcast'),/casella avvisi/i);
+ assert.doesNotMatch(localActionFeedback('broadcast'),/notifica consegnata|push ricevuta/i);
+ for(const action of ['install','koha-hold','koha-checkout','unknown'])
+   assert.equal(localActionFeedback(action),null);
+});

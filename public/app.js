@@ -1,4 +1,4 @@
-import {libraryCopy,installExperience,pushExperience,actionConfirmation,localAvailability,localHoldResult,localStatus,localActionFeedback} from './experience.js';
+import {libraryCopy,installExperience,pushExperience,actionConfirmation,localAvailability,localHoldResult,localStatus,localActionFeedback,localClickFeedback} from './experience.js';
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
 const dialog=document.querySelector('#lumen-dialog');
@@ -358,7 +358,7 @@ document.addEventListener('click',async event=>{
     if(action==='enable-push'){await enablePush();message('Notifiche attive su questo dispositivo');await render();return;}
     if(action==='disable-push'){await disablePush();message('Notifiche disattivate su questo dispositivo');await render();return;}
     if(action==='reset-push'){await clearLocalPush();message('Dispositivo ripristinato. Puoi attivare le notifiche per questo account.');await render();return;}
-    message('Operazione completata');await render();
+    message(localClickFeedback(action)||'Esito da verificare nella pagina corrente.',!localClickFeedback(action));await render();
   }catch(e){message(e.message,true);b.disabled=false;}
 });
 document.addEventListener('submit',async event=>{
