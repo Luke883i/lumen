@@ -22,7 +22,7 @@ export default function(){
   if(__ITER===0 || __ITER===1){
     const res=http.post(base+'/api/holds',JSON.stringify({bookId:bookId}),{headers:header,tags:{name:'hold-write'}});
     const ok=check(res,{'committed or replayed':r=>r.status===201,'valid receipt':r=>{
-      try{return JSON.parse(r.body).user_id==='load-user-'+id;}catch{return false;}
+      try{return JSON.parse(r.body).user_id==='load-user-'+id;}catch(e){return false;}
     }});
     failed.add(!ok);
     if(ok){
