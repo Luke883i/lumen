@@ -23,7 +23,7 @@ test('UX-S5 stale GET result cannot overwrite the new route or keyboard focus',a
     blocked();
     await gate;await route.continue();
   });
-  await page.locator('a[data-nav][href="/catalogo"]').first().click();
+  await page.locator('a[data-nav][href="/catalogo"]:visible').first().click();
   await arrived;
   await expect(page.locator('#main')).toContainText('Caricamento');
   // Navigate via the exact popstate route used by Back/Forward while the

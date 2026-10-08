@@ -423,7 +423,7 @@ document.addEventListener('click',async event=>{
       navigate('/');message('Sessione terminata');return;
     }
     if(['cancel-hold','return','disable'].includes(action)){
-      if(!await confirmation(action,b)){b.disabled=false;return;}
+      if(!await confirmation(action,b)){finish();b.focus();return;}
     }
     if(action==='cancel-hold')await api('/api/holds/'+encodeURIComponent(id)+'/cancel','POST');
     if(action==='renew')await api('/api/loans/'+encodeURIComponent(id)+'/renew','POST');
