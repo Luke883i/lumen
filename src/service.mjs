@@ -329,6 +329,12 @@ export function createService(s) {
         return {ok:true};
       });
     },
+    subscriptionStatus(user,endpoint) {
+      requireRole(user,['student','faculty','librarian']);
+      const value=str(endpoint,2000);
+      if(!value)return {owned:false};
+      return {owned:!!s.get('SELECT 1 FROM subscriptions WHERE endpoint=? AND user_id=?',value,user.id)};
+    },
     unsubscribe(user,endpoint) {
       requireRole(user,['student','faculty','librarian']);
       s.run('DELETE FROM subscriptions WHERE user_id=? AND endpoint=?',user.id,str(endpoint,2000));

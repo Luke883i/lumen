@@ -189,7 +189,8 @@ export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCircul
       if(method==='GET'&&path==='/api/notifications') return respond(res,api.notifyList(user));
       if(method==='POST'&&path.startsWith('/api/notifications/')&&path.endsWith('/read')) return respond(res,api.readNotification(user,pathId(path,'/api/notifications/','/read')));
       if(method==='GET'&&path==='/api/push-config') return respond(res,{enabled:!!(process.env.VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY),publicKey:process.env.VAPID_PUBLIC_KEY||''});
-      if(method==='POST'&&path==='/api/push-subscription'){const b=await readJson(req);return respond(res,api.subscribe(user,b));}
+      if(method==='GET'&&path==='/api/push-subscription') return respond(res,api.subscriptionStatus(user,url.searchParams.get('endpoint')));
+      if(method==='POST'&&path==='/api/push-subscription'){const b=await readJson(req);return respond(res,api.subscribe(user,b,token));}
       if(method==='DELETE'&&path==='/api/push-subscription'){const b=await readJson(req);return respond(res,api.unsubscribe(user,b.endpoint));}
       if(method==='GET'&&path==='/api/staff/audit') return respond(res,api.audit(user,url.searchParams.get('limit')));
       if(method==='GET'&&path==='/api/staff/stats') return respond(res,api.stats(user));
