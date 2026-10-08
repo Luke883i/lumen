@@ -1,6 +1,6 @@
 # LUMEN — minimal product lattice / closure contract
 
-**Baseline:** R1–R7 merged as of 2026-10-08. **Desired class:** a pleasant three-role installable library PWA, bootable in Codespaces with `npm run dev`, deployable on Render with `npm start`; enterprise grade only after *external* functional, security, resilience and capacity evidence.
+**Baseline:** R1–R8 merged as of 2026-10-08; R9 browser harness is in PR #9. **Desired class:** a pleasant three-role installable library PWA, bootable in Codespaces with `npm run dev`, deployable on Render with `npm start`; enterprise grade only after *external* functional, security, resilience and capacity evidence.
 
 ## 1. Intent → executable contract
 
@@ -16,7 +16,7 @@
 ## 2. Minimal dependency lattice (partial order, not a waterfall)
 
 ```text
-    R1–R7 MERGED / reproducible standalone PWA + optional Koha/OIDC contracts
+    R1–R8 MERGED / reproducible standalone PWA + UX and Koha/OIDC contracts
           |                |                      |
       R8 UX/PWA         R10 Render live       R11 Koha + IdP live
       /       \             |                      |
@@ -32,7 +32,7 @@
 The workstreams are **parallel where they can be**: Render deployment verification (R10) depends on merged R7 and access to Render, **not** on Chrome cosmetic polish; live Koha/IdP acceptance (R11) depends on the existing R3–R6 integrations and staging access, **not** on R8; real-device UX (R9) and push lifecycle (R9b) depend on R8. Only certification R12 and final signoff R13 require all preceding evidence. This is the minimal dependency cut rather than an arbitrary chain of numbered PRs.
 
 - **R8 (now)**: branded global/intermediate/local design tokens, truthful Italian microcopy, action dialog, install-state machine and push preferences; static/unit tests. Mergeable independently of live services.
-- **R9 / R9b**: test actual Android Chrome installation, Windows Chrome window mode, Chrome notification permission and keyboard/focus through a real browser; test failure/offline/reload/error states; push subscription privacy and lifecycle regression.
+- **R9 (this PR)**: real Chromium GUI automation against `npm run dev` for desktop and Android emulation, covering catalog/roles/holds/modal/offline/PWA consent fallback. **R9 physical-device gate remains OPEN**: Android launcher, Windows standalone shell and OS push require device evidence. **R9b**: browser + backend subscription ownership, unsubscribe and delivery/failure lifecycle hardening.
 - **R10**: Render operator deploy through Blueprint, `EXPECTED_SHA=... npm run verify:remote -- https://...`, persisted-state restart, offsite encrypted backup and timed restore artifact (single-node pilot operability).
 - **R11**: live Koha circulation and institutional OIDC acceptance with real test fixtures, staff permissions, policy/refusal and revocation. Requires accounts, credentials and institutional approval; mock green does **not** satisfy.
 - **R12**: mixed 2,000 concurrent authenticated users against realistic Koha/Render targets (arrival rates, latency percentiles, queue depths, errors, resource saturation, recovery), HA/DR decision, accessibility, privacy and independent security signoff. SQLite/single instance may require architectural migration.

@@ -20,7 +20,8 @@
     "prestart": "node scripts/preflight.mjs",
     "verify:boot": "node scripts/verify-boot.mjs",
     "verify:deploy": "node scripts/verify-deploy.mjs",
-    "verify:remote": "node scripts/verify-remote.mjs"
+    "verify:remote": "node scripts/verify-remote.mjs",
+    "test:browser": "npm --prefix browser test"
   },
   "dependencies": {
     "web-push": "^3.6.7",

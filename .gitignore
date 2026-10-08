@@ -5,3 +5,7 @@ data/
 *.sqlite-wal
 .env
 .DS_Store
+
+# R9 isolated Playwright artifacts
+browser/test-results/
+browser/playwright-report/
