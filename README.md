@@ -30,6 +30,10 @@ Web Push is now scoped to authenticated account and session. Browser logout and 
 
 The [semantic UX lattice](docs/UX_SEMANTIC_LATTICE.md) and [business copy/authority audit](docs/UX_COPY_AUDIT.md) define source-bound statuses, clear CTAs and the remaining visual recomposition slices. LUMEN now differentiates local book availability, queued vs ready reservations, approved vs ordered proposals and local server acknowledgements; this does not alter Koha authority. Follow-on UX-S2...S6 handle task projections, navigation, visual compression, CTA quality and composition audit. **Codespaces still runs with `npm run dev`; Render still uses `npm start`.**
 
+## UX-S5 — Linear actions and verified outcomes
+
+A search, reservation, acquisition and staff action now shows a deterministic in-progress state. Network loss during a **write** is treated as an uncertain outcome; do not submit a second request before checking the authoritative status. Completed local holds and proposals display a small next-step link. The interface rejects stale responses from previous navigation. [UX-S5 action-state contract](docs/UX_S5_ACTIONS.md).
+
 ## LUMEN experience and installable PWA
 
 The [product lattice](docs/PRODUCT_LATTICE.md) and [real-device acceptance matrix](docs/UX_ACCEPTANCE.md) specify the minimal R8–R13 sequence to move from a polished pilot to an evidence-backed enterprise release. R8 introduces LUMEN design tokens, a public **/installazione** guide for Android Chrome and Windows Chrome/Edge, consent-aware Chrome notifications, a native keyboard-accessible confirmation dialog and honest guest/student/faculty/librarian copy. No UI framework or extra package is required.

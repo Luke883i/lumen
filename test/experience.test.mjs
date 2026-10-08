@@ -174,3 +174,14 @@ test('UX-S2 runtime uses provenance selectors without introducing browser-side a
  assert.ok(pkg.scripts.check.includes('node --check public/projections.js'));
  assert.doesNotMatch(app,/badge\(.*copies.*koha/i);
 });
+
+test('UX-S5 web shell caches the interaction guard for PWA offline navigation',()=>{
+ const sw=load('public/sw.js');
+ const app=load('public/app.js');
+ assert.ok(sw.includes("'/interaction.js'"));
+ assert.ok(app.includes('createRenderEpoch()'));
+ assert.ok(app.includes('renderEpoch.latest(ticket)'));
+ assert.ok(app.includes("aria-busy"));
+ assert.ok(app.includes("showActionResult('hold'"));
+ assert.ok(app.includes("mutationFailure({method,transport:'network'})"));
+});

@@ -114,3 +114,7 @@ No PR count, screenshot quality, or green mock CI alone qualifies LUMEN as enter
 ### UX-S4 measurement protocol
 
 Measure computed CSS bounding boxes in real Chromium across desktop 1440×900, Android 393×851 and narrow 320×700 (each at 100% default root font). Hero height ≤240 desktop / ≤180 mobile, decorative cover ≤64×88, metric card ≤112 at default font scale, no viewport overflow, visible navigation and no loss of text at root font-size 200%. Tap-target preference ≥44×44 for actionable buttons/links in primary task flows. These are **LUMEN budgets**, not WCAG numeric thresholds. Do not set max-height to make a budget pass by clipping content. Browser test evidence is commit-bound; physical devices and WCAG manual audits remain open.
+
+## UX-S5 in flight (PR #16)
+
+Render epoch guards against stale asynchronous page results. Every high-impact form button is disabled and marked aria-busy while its request is in flight. A mutating request that loses its response (network, malformed response or 5xx) becomes explicitly `uncertain`: users are directed to verify the result before submitting again; the initial request's idempotency key is retained. Holds and acquisition proposals expose compact persistent next-step links after server receipts. The browser harness must falsify stale navigation, double submission, interrupted POST and native Escape/focus before promotion to review. UX-S6 remains cross-route audited composition and assistive technology acceptance. No new backend authority is created.
