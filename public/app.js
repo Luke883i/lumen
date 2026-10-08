@@ -154,7 +154,7 @@ function header(){
     +secondary.map(item=>routeLink(item.path,t(item.label),activeNavigation(here,item.path))).join('')+'</div></details>':'';
   const account=state.user?routeLink('/impostazioni',ic('user')+' '+t(state.user.name.split(' ')[0]),here==='/impostazioni')
     :routeLink('/accedi','Accedi',here==='/accedi');
-  const logo='<a class="brand" data-nav href="/"><svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#10243a"/><path d="M8 15c6-1 10 1 12 4 2-3 6-5 12-4v15c-6-1-10 1-12 4-2-3-6-5-12-4Z" fill="none" stroke="#f7f5ef" stroke-width="2"/><circle cx="20" cy="10" r="4" fill="#d5a646"/></svg>LUMEN</a>';
+  const logo='<a class="brand" data-nav href="/"><svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#0b2550"/><path d="M8 15c6-1 10 1 12 4 2-3 6-5 12-4v15c-6-1-10 1-12 4-2-3-6-5-12-4Z" fill="none" stroke="#f4f8ff" stroke-width="2"/><circle cx="20" cy="10" r="4" fill="#bfebff"/></svg>LUMEN</a>';
   return '<header class="site-header shell">'+logo
     +'<nav class="nav" aria-label="Navigazione principale">'+primaryDesktop+more+account+'</nav></header>'
     +'<nav class="bottom-nav" aria-label="Navigazione mobile">'+bottom+'</nav>';
