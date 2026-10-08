@@ -9,6 +9,7 @@ import { createKohaCirculation } from './koha-circulation.mjs';
 import { createKohaLoans } from './koha-loans.mjs';
 import { createKohaReturns } from './koha-returns.mjs';
 import { createOidc } from './oidc.mjs';
+import {trustedOrigin} from './security.mjs';
 
 const s=openStore(process.env.LUMEN_DB_PATH || './data/lumen.sqlite');
 bootstrap(s);
@@ -56,8 +57,8 @@ function originGuard(req) {
   const origin=req.headers.origin;
   const host=req.headers.host;
   if(!origin||!host) throw new Failure(403,'ORIGIN_REQUIRED','Origin richiesto');
-  const originURL=new URL(origin);
-  if(originURL.host!==host || !['http:','https:'].includes(originURL.protocol)) throw new Failure(403,'ORIGIN_MISMATCH','Richiesta cross-origin rifiutata');
+  if(!trustedOrigin(origin,host,{production:prod}))
+    throw new Failure(403,'ORIGIN_MISMATCH','Richiesta cross-origin rifiutata');
 }
 const getPublic=async(path,res)=>{
   const p=path==='/'?'/index.html':path;

@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import {validPushKeys} from './push-keys.mjs';
+import {pruneRevokedPush} from './security.mjs';
 import { newId, now, hashPassword, verifyPassword, tokenHash } from './store.mjs';
 
 export class Failure extends Error {
@@ -91,6 +92,7 @@ export function createService(s) {
       s.tx(()=>{
         s.run("DELETE FROM sessions WHERE expires_at<?",now());
         s.run("DELETE FROM sessions WHERE user_id=? AND token_hash NOT IN (SELECT token_hash FROM sessions WHERE user_id=? ORDER BY rowid DESC LIMIT 4)",u.id,u.id);
+        pruneRevokedPush(s); // session eviction must revoke its device channels
         s.run('INSERT INTO sessions(token_hash,user_id,csrf,expires_at) VALUES(?,?,?,?)',tokenHash(token),u.id,csrf,expires);
       });
       return { token, user:{id:u.id,name:u.name,role:u.role,email:u.email}, csrf };
@@ -260,6 +262,7 @@ export function createService(s) {
       s.tx(()=>{
         s.run('UPDATE users SET passhash=? WHERE id=?',hashPassword(newPassword),user.id);
         s.run('DELETE FROM sessions WHERE user_id=?',user.id);
+        s.run('DELETE FROM subscriptions WHERE user_id=?',user.id); // password rotation revokes every device
       });
       return {ok:true,reauthenticate:true};
     },
