@@ -99,3 +99,7 @@ A green automated browser test is **not** physical Android launcher installation
 ## R9b — Web Push isolation
 
 Cross-account endpoint reassignment is forbidden. Logout, role disable, account switch and stale provider delivery are tested with an explicit session-binding contract; existing legacy subscriptions are intentionally purged on migration. Real Android/Windows Chrome delivery and consent acceptance remain BLOCKED. See [PUSH_LIFECYCLE.md](PUSH_LIFECYCLE.md).
+
+## UX-S2 — Proiezioni di lettura, nessuna nuova autorità
+
+Implementazione in `public/projections.js`, consumata dalla UI LUMEN e inclusa nella shell offline. Test di mutazione su titolo locale, Koha bibliografico, prestiti, prenotazioni, proposte, comunicazioni, ruolo e verifiche Koha; `node --check`, CI di dominio/HTTP, browser desktop e Android emulato, Codespaces e Render contract. Le azioni esposte sono affordance condizionali, non autorizzazioni; il backend resta l'unica autorità delle transizioni. Evidenze reali Koha, Render, Android, 2.000 utenti concorrenti e signoff istituzionale ancora **BLOCKED**.

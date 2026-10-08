@@ -162,3 +162,15 @@ test('local action text does not imply remote push delivery or an unperformed lo
  for(const action of ['install','koha-hold','koha-checkout','unknown'])
    assert.equal(localActionFeedback(action),null);
 });
+
+test('UX-S2 runtime uses provenance selectors without introducing browser-side authority',async()=>{
+ const app=load('public/app.js');
+ const worker=load('public/sw.js');
+ const pkg=JSON.parse(load('package.json'));
+ const methods=['projectLocalBook','projectLocalHold','projectLocalLoan','projectAcquisition',
+   'projectNotification','projectPatron','projectKohaBook','projectKohaOperation'];
+ for(const method of methods)assert.ok(app.includes(method+'('),method+' is wired into a view');
+ assert.ok(worker.includes("'/projections.js'"),'offline shell caches read models');
+ assert.ok(pkg.scripts.check.includes('node --check public/projections.js'));
+ assert.doesNotMatch(app,/badge\(.*copies.*koha/i);
+});
