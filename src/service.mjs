@@ -1,4 +1,5 @@
 import { randomBytes, createHash } from 'node:crypto';
+import {validPushKeys} from './push-keys.mjs';
 import { newId, now, hashPassword, verifyPassword, tokenHash } from './store.mjs';
 
 export class Failure extends Error {
@@ -314,9 +315,8 @@ export function createService(s) {
       const approved=['fcm.googleapis.com','fcm-xm.googleapis.com','android.googleapis.com','updates.push.services.mozilla.com','web.push.apple.com'];
       if(!approved.includes(endpointHost)&&!endpointHost.endsWith('.notify.windows.com')&&!endpointHost.endsWith('.push.apple.com'))
         fail(400,'PUSH_PROVIDER_DENIED','Provider push non consentito');
-      const validKey=x=>typeof x==='string'&&x.length>=20&&x.length<=120&&/^[A-Za-z0-9_-]+={0,2}$/.test(x);
       if(typeof subscription?.endpoint!=='string'||subscription.endpoint.length>2000||
-        !validKey(subscription.keys?.p256dh)||!validKey(subscription.keys?.auth))
+        !validPushKeys(subscription.keys))
         fail(400,'INPUT_INVALID','Sottoscrizione push non valida');
       return s.tx(()=>{
         const existing=s.get('SELECT user_id FROM subscriptions WHERE endpoint=?',subscription.endpoint);

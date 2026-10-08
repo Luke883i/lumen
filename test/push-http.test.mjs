@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {openStore,bootstrap} from '../src/store.mjs';
 import {createService} from '../src/service.mjs';
+import {pushKeys} from './push-fixtures.mjs';
 process.env.NODE_ENV='test';
 process.env.LUMEN_DEMO='1';
 process.env.LUMEN_DB_PATH=':memory:';
 const {buildHandler}=await import('../src/server.mjs');
-const keys={p256dh:'A'.repeat(87),auth:'B'.repeat(22)};
+const keys=pushKeys;
 const subscription={endpoint:'https://fcm.googleapis.com/fcm/send/lumen-r9b-http-001',keys};
 test('R9b HTTP: authenticated device ownership, CSRF, cross-account rejection and logout revocation',async()=>{
  const s=openStore(':memory:');bootstrap(s,{NODE_ENV:'test',LUMEN_DEMO:'1'});

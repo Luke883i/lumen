@@ -7,8 +7,10 @@ import {DatabaseSync} from 'node:sqlite';
 import {openStore,bootstrap} from '../src/store.mjs';
 import {createService} from '../src/service.mjs';
 import {beginPushWorker} from '../src/webpush.mjs';
+import {pushKeys} from './push-fixtures.mjs';
+import {validPushKeys} from '../src/push-keys.mjs';
 
-const keys={p256dh:'A'.repeat(87),auth:'B'.repeat(22)};
+const keys=pushKeys;
 const endpoint=n=>'https://fcm.googleapis.com/fcm/send/lumen-device-'+n;
 const sub=n=>({endpoint:endpoint(n),expirationTime:null,keys});
 const failure=(fn,code)=>assert.throws(fn,e=>e.code===code);
@@ -180,6 +182,24 @@ test('stale 410 response does not delete a same-account renewed session binding'
   f.api.logout(a);
   assert.equal(f.api.subscriptionStatus(f.student,endpoint('refresh-race')).owned,true);
   f.api.logout(b);
+  assert.equal(f.s.get('SELECT count(*) n FROM subscriptions').n,0);
+ }finally{f.s.close();}
+});
+
+test('R9b Web Push key syntax enforces valid P-256 and 16-byte auth before persistence',()=>{
+ const f=fixture(),token=f.login(f.student);
+ try{
+  assert.equal(validPushKeys(keys),true);
+  const invalid=[
+    {p256dh:'A'.repeat(87),auth:keys.auth}, // correct length but not a valid curve point
+    {p256dh:keys.p256dh,auth:'B'.repeat(16)}, // decodes to only 12 octets
+    {p256dh:keys.p256dh,auth:keys.auth+'!'},
+    {p256dh:keys.p256dh+'=',auth:keys.auth} // impossible padding for 65 bytes
+  ];
+  for(const k of invalid){
+    assert.equal(validPushKeys(k),false);
+    failure(()=>f.api.subscribe(f.student,{endpoint:endpoint('key-invalid'),keys:k},token),'INPUT_INVALID');
+  }
   assert.equal(f.s.get('SELECT count(*) n FROM subscriptions').n,0);
  }finally{f.s.close();}
 });
