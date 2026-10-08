@@ -1,13 +1,14 @@
 name: R9 Browser Acceptance
 on:
   push:
-    branches: [main, feat/lumen-r9-browser-e2e]
+    branches: [main, feat/lumen-r9-browser-e2e, fix/lumen-e2e-reservations-notifications]
     paths:
       - 'browser/**'
       - 'public/**'
       - 'src/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'scripts/dev-push.mjs'
       - '.github/workflows/browser-ci.yml'
   pull_request:
     paths:
