@@ -106,3 +106,10 @@
   .section-head > h2{flex:1 1 100%}
   .section-head > .btn,.section-head > a{max-width:100%;white-space:normal}
 }
+
+/* UX-S5: small, persistent next-step receipt; no oversized card. */
+.action-outcome{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:10px 14px;margin:10px 0;border:1px solid #a5cdc3;border-left:4px solid var(--lumen-teal);background:#eef7f4;border-radius:var(--lumen-radius-sm)}
+.action-outcome p{margin:0;flex:1 1 240px;color:var(--lumen-ink);line-height:1.45}
+.action-outcome .btn{flex-shrink:0}
+button[aria-busy="true"]{cursor:progress;opacity:.75}
+@media(max-width:600px){.action-outcome .btn{width:100%}}
