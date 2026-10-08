@@ -158,3 +158,14 @@ test('web push endpoints cannot redirect delivery to arbitrary hosts',()=>{
   assert.ok(svc.subscribe(student,{endpoint:'https://fcm.googleapis.com/fcm/send/abc',keys:{p256dh:'AA',auth:'BB'}}).ok);
   s.close();
 });
+
+test('multiple simultaneous sessions per account are supported but capped',()=>{
+  const {s,svc,user}=fixture();
+  const student=user('student');
+  const sessions=Array.from({length:5},()=>svc.login(student.email,'Demo1234!'));
+  assert.equal(sessions.filter(x=>svc.current(x.token)).length,5);
+  const sixth=svc.login(student.email,'Demo1234!');
+  assert.equal(svc.current(sessions[0].token),null);
+  assert.ok(svc.current(sixth.token));
+  s.close();
+});

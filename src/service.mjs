@@ -69,7 +69,8 @@ export function createService(s) {
       const csrf=randomBytes(24).toString('base64url');
       const expires=daysAfter(now(),0.5);
       s.tx(()=>{
-        s.run("DELETE FROM sessions WHERE user_id=? OR expires_at<?",u.id,now());
+        s.run("DELETE FROM sessions WHERE expires_at<?",now());
+        s.run("DELETE FROM sessions WHERE user_id=? AND token_hash NOT IN (SELECT token_hash FROM sessions WHERE user_id=? ORDER BY rowid DESC LIMIT 4)",u.id,u.id);
         s.run('INSERT INTO sessions(token_hash,user_id,csrf,expires_at) VALUES(?,?,?,?)',tokenHash(token),u.id,csrf,expires);
       });
       return { token, user:{id:u.id,name:u.name,role:u.role,email:u.email}, csrf };
