@@ -115,9 +115,9 @@ export function createOidc(s,env=process.env,provider=null){
         if(used&&used.user_id!==user.id)denied(409,'OIDC_SUBJECT_IN_USE','Identità già associata');
         const previous=s.get('SELECT subject FROM oidc_bindings WHERE user_id=?',user.id);
         if(previous&&previous.subject!==subject)denied(409,'OIDC_BINDING_EXISTS','La sostituzione dell’identità richiede una procedura di recupero dedicata');
-        s.run('INSERT OR IGNORE INTO oidc_bindings(user_id,issuer,subject,linked_by,linked_at) VALUES(?,?,?,?,?)',
+        const result=s.run('INSERT OR IGNORE INTO oidc_bindings(user_id,issuer,subject,linked_by,linked_at) VALUES(?,?,?,?,?)',
           user.id,settings.issuer.replace(/\/$/,''),subject,staff.id,now());
-        s.run('INSERT INTO audit_events(actor_id,operation,request_hash,receipt_hash,idempotency_key,occurred_at) VALUES(?,?,?,?,?,?)',
+        if(result.changes) s.run('INSERT INTO audit_events(actor_id,operation,request_hash,receipt_hash,idempotency_key,occurred_at) VALUES(?,?,?,?,?,?)',
           staff.id,'oidc_bind',digest(JSON.stringify({issuer:settings.issuer,subject})),
           digest(JSON.stringify({userId:user.id})),null,now());
         return {userId:user.id,linked:true};

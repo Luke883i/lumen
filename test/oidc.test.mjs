@@ -66,6 +66,8 @@ test('issuer subject binding is immutable and cannot be attached to two accounts
  const f=setup();
  const first=f.oidc.bind(f.librarian,f.student.id,'subject-123');
  assert.equal(first.userId,f.student.id);
+ assert.equal(f.oidc.bind(f.librarian,f.student.id,'subject-123').linked,true);
+ assert.equal(f.s.get("SELECT count(*) n FROM audit_events WHERE operation='oidc_bind'").n,1);
  assert.throws(()=>f.oidc.bind(f.librarian,f.faculty.id,'subject-123'),e=>e.code==='OIDC_SUBJECT_IN_USE');
  assert.throws(()=>f.oidc.bind(f.librarian,f.student.id,'another-identity'),e=>e.code==='OIDC_BINDING_EXISTS');
  assert.equal(f.s.get('SELECT count(*) n FROM oidc_bindings').n,1);
