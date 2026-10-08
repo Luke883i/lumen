@@ -50,9 +50,15 @@ async function api(path,method='GET',body) {
 }
 function message(text,bad=false) {
   toast.textContent=text;toast.className='toast'+(bad?' error':'');toast.hidden=false;
+  toast.setAttribute('role',bad?'alert':'status');
+  toast.setAttribute('aria-live',bad?'assertive':'polite');
   clearTimeout(message.timer);message.timer=setTimeout(()=>toast.hidden=true,4700);
 }
-function navigate(to) {history.pushState({},'',to);render();window.scrollTo({top:0,behavior:'instant'});}
+function navigate(to) {
+  history.pushState({},'',to);
+  render().then(()=>document.querySelector('#main')?.focus({preventScroll:true}));
+  window.scrollTo({top:0,behavior:'instant'});
+}
 const installModel=()=>installExperience({
   standalone:matchMedia('(display-mode: standalone)').matches||navigator.standalone===true,
   canPrompt:!!state.install,userAgent:navigator.userAgent
@@ -169,7 +175,7 @@ async function staff(){
 function forbidden(){return sectionTitle('Accesso non consentito','Il tuo profilo non dispone delle autorizzazioni richieste.')+'<a class="btn" data-nav href="/">Torna alla home</a>';}
 function login(){
   if(state.user)return sectionTitle('Sei già connesso','Accedi alle tue funzioni dal menu.')+'<a data-nav class="btn" href="/me">La mia biblioteca</a>';
-  return '<div class="layout section"><div class="card"><p class="eyebrow">Accesso riservato</p><h1 style="font-size:2.5rem">Bentornato su LUMEN.</h1><p class="muted">Accedi con l’identità istituzionale o con le credenziali autorizzate dalla biblioteca.</p>'+(state.oidcEnabled?'<a class="btn" href="/api/auth/oidc/start">Accedi con Single Sign-On</a>':'')+(new URLSearchParams(location.search).has('auth_error')?'<p class="alert">Accesso istituzionale non completato. Contatta la biblioteca per verificare l’associazione dell’account.</p>':'')+(state.oidcOnly?'':'<form class="form" data-form="login">'+field('Email','email','nome@universita.it',true,'email')+field('Password','password','La tua password',true,'password')+'<button class="btn" type="submit">Accedi</button></form>')+'</div><div class="card"><h2>Tre profili, una piattaforma</h2><p><strong>Studente</strong> · Catalogo, prestiti e prenotazioni.</p><p><strong>Docente</strong> · Tutto ciò che serve per lo studio e le proposte di acquisto.</p><p><strong>Bibliotecario</strong> · Banco prestiti, gestione e comunicazioni.</p><p class="fine">Nessuna registrazione pubblica: gli utenti vengono abilitati dalla biblioteca.</p></div></div>';
+  return '<div class="layout section"><div class="card"><p class="eyebrow">Accesso riservato</p><h1 style="font-size:2.5rem">Bentornato su LUMEN.</h1><p class="muted">Accedi con l’identità istituzionale o con le credenziali autorizzate dalla biblioteca.</p>'+(state.oidcEnabled?'<a class="btn" href="/api/auth/oidc/start">Accedi con Single Sign-On</a>':'')+(new URLSearchParams(location.search).has('auth_error')?'<p class="alert">Accesso istituzionale non completato. Contatta la biblioteca per verificare l’associazione dell’account.</p>':'')+(state.oidcOnly?'':'<form class="form" data-form="login">'+field('Email','email','nome@universita.it',true,'email')+field('Password','password','La tua password',true,'password')+'<button class="btn" type="submit">Accedi</button></form>')+'</div><div class="card"><h2>Tre profili, una piattaforma</h2><p>'+t(libraryCopy.roles.student)+'</p><p>'+t(libraryCopy.roles.faculty)+'</p><p>'+t(libraryCopy.roles.librarian)+'</p><p class="fine">Nessuna registrazione pubblica: gli utenti vengono abilitati dalla biblioteca.</p></div></div>';
 }
 function installPage(){
   const x=installModel();
@@ -187,7 +193,7 @@ async function settings(){
   const supported='serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;
   let subscribed=false;
   if(cfg.enabled&&supported&&Notification.permission==='granted'){
-    try{const reg=await navigator.serviceWorker.ready;subscribed=!!(await reg.pushManager.getSubscription());}catch{}
+    try{const reg=await navigator.serviceWorker.getRegistration('/');subscribed=!!(await reg?.pushManager?.getSubscription());}catch{}
   }
   const push=pushExperience({serverEnabled:cfg.enabled,secure:window.isSecureContext,
     supported,permission:supported?Notification.permission:'default',subscribed});
@@ -297,11 +303,11 @@ async function render(){
   root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1"><div class="empty">Caricamento…</div></main>'+footer();
   try{
     const markup=await view();
-    root.innerHTML=header()+'<main id="main" class="shell">'+markup+'</main>'+footer();
+    root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1">'+markup+'</main>'+footer();
     // Install buttons are state-derived, never shown when Chrome has no prompt.
     document.title='LUMEN · '+(location.pathname==='/'?'La tua biblioteca':location.pathname.split('/')[1]);
   }catch(e){
-    root.innerHTML=header()+'<main id="main" class="shell">'+sectionTitle('Servizio temporaneamente non disponibile',e.message)+'<a data-nav class="btn" href="/">Torna alla home</a></main>'+footer();
+    root.innerHTML=header()+'<main id="main" class="shell" tabindex="-1">'+sectionTitle('Servizio temporaneamente non disponibile',e.message)+'<a data-nav class="btn" href="/">Torna alla home</a></main>'+footer();
   }
 }
 document.addEventListener('click',async event=>{
