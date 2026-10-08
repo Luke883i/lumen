@@ -35,3 +35,7 @@ Fail if any normal-scale budget is breached, a long title is truncated, a primar
 ## Operator commands
 
 Codespaces: `npm run dev` -> forwarded port 3000. Optional visual tests: `npm --prefix browser ci`, `npm --prefix browser exec -- playwright install chromium`, `npm run test:browser`. Render retains `npm start` and existing deploy preflight.
+
+## Tested CI evidence
+
+The first Playwright run found a 200-percent text/reflow defect at narrow 320px width and rejected the PR. The subsequent semantic fix wraps section headings and adjacent action links rather than clipping text. All 44 browser cases were processed on commit 823fb670b5c1b93b4787733264d8ae7414bcbc94 (passing cases with any skip explicitly reported by Playwright). SHA-bound measurements and browser reports are archived as GitHub Actions artifacts. All external qualifications remain separate.

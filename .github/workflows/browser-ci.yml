@@ -49,6 +49,7 @@ jobs:
         run: |
           { echo '### Browser acceptance failure at ${{ github.sha }}'; echo '~~~text'; tail -n 140 /tmp/lumen-browser-acceptance.log 2>/dev/null || true; echo '~~~'; } > /tmp/lumen-browser-errors.md
           gh pr comment "$PR_NUMBER" --body-file /tmp/lumen-browser-errors.md
+      # PR #15 visual-budget evidence is retained even when all tests pass.
       - name: Archive SHA-bound UX-S4 measurements
         if: always()
         uses: actions/upload-artifact@v4

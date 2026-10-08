@@ -23,7 +23,7 @@ MERGED baseline (R1–R9b)
           |
      UX-S3 role/task IA and progressive-disclosure recomposition [merged]
           |
-     UX-S4 visual compression and responsive density budgets [PR #14]
+     UX-S4 visual compression and responsive density budgets [PR #15; browser budgets PASS]
           |
      UX-S5 end-to-end CTA, accessibility and interaction clarity
           |
