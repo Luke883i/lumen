@@ -71,7 +71,7 @@ test('UX-S6A: gradients stay deliberate; never inflate compact UX-S4 dimensions'
  assert.equal(tokens['--lumen-cover-width'],'56px');
  assert.equal(tokens['--lumen-cover-height'],'76px');
  assert.match(css,/\.card,\s*\.nav-more-menu,\s*\.task-link/);
- assert.match(css,/\.btn:not\(\.alt\):not\(\.ghost\):not\(\.gold\):not\(\.danger-action\)/);
+ assert.ok(css.includes('.btn:not(.alt):not(.ghost):not(.search-primary):not(.danger-action)'));
  assert.match(css,/\.install-panel\s*\{\s*background:linear-gradient\(/);
  assert.doesNotMatch(css,/\.card\s*\{\s*background:linear-gradient\(/);
 });

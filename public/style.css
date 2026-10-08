@@ -135,7 +135,7 @@ body{color:var(--lumen-body);background:var(--lumen-paper)}
 .hero .eyebrow{color:var(--lumen-sky)}
 .hero p{color:#e5efff}
 .hero-install a{color:#d3eaff}
-.btn:not(.alt):not(.ghost):not(.gold):not(.danger-action){background:var(--lumen-gradient-cta);color:white}
+.btn:not(.alt):not(.ghost):not(.search-primary):not(.danger-action){background:var(--lumen-gradient-cta);color:white}
 .btn.search-primary{background:var(--lumen-gradient-sky);color:var(--lumen-ink)}
 .btn.alt{background:var(--lumen-blue-soft);color:#17478f}
 .btn.ghost{color:var(--lumen-ink);border-color:var(--lumen-blue-border)}
