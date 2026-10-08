@@ -20,11 +20,12 @@ test('HTTP SSO: redirects and cookies remain server-bound, staff mapping CSRF an
    randomPKCECodeVerifier:()=> 'verifier',
    calculatePKCECodeChallenge:async()=> 'challenge',
    discovery:async()=>({serverMetadata:()=>({issuer})}),
+   enableNonRepudiationChecks:()=>{},
    buildAuthorizationUrl:(cfg,params)=>{const url=new URL(issuer+'/auth');Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));return url;},
    authorizationCodeGrant:async(cfg,url,checks)=>{
      calls++;
      assert.equal(checks.expectedState,url.searchParams.get('state'));
-     return {getValidatedIdTokenClaims:()=>({iss:issuer,sub:'institutional-sub-101',email:student.email,email_verified:true,groups:['superadmin']})};
+     return {claims:()=>({iss:issuer,sub:'institutional-sub-101',email:student.email,email_verified:true,groups:['superadmin']})};
    }
  });
  const server=createServer(buildHandler({database:store,api:service,oidcApi:oidc}));

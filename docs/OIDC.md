@@ -1,6 +1,6 @@
 # R6 — Institutional OIDC identity
 
-Use openid-client v6 for Authorization Code + PKCE, state, nonce, issuer discovery, and signature-validated ID Tokens. LUMEN retains its own opaque server-side sessions and role-based authorization.
+Use openid-client 6.8.8 for Authorization Code + PKCE, state, nonce and issuer discovery. The client enables JWS signature validation against the IdP's published JWKS via enableNonRepudiationChecks; validated claims are obtained using the v6 tokens.claims() API, not manually decoded. LUMEN retains its own opaque server-side sessions and role-based authorization.
 
 ## Configuration (all required, feature OFF by default)
 

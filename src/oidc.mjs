@@ -38,6 +38,9 @@ export function createOidc(s,env=process.env,provider=null){
     loading=(async()=>{
       const lib=await implementation();
       const config=await lib.discovery(new URL(settings.issuer),settings.clientId,settings.clientSecret);
+      // TLS validates the token endpoint; enable JWS signature validation too for
+      // explicit issuer-key proof and defense against token endpoint compromise.
+      lib.enableNonRepudiationChecks(config);
       if(config.serverMetadata().issuer!==settings.issuer.replace(/\/$/,''))throw Error('OIDC_ISSUER_MISMATCH');
       return {lib,config};
     })();
@@ -84,7 +87,9 @@ export function createOidc(s,env=process.env,provider=null){
       const tokens=await lib.authorizationCodeGrant(config,uri,{
         expectedState:state,expectedNonce:pending.nonce,pkceCodeVerifier:pending.verifier,idTokenExpected:true
       });
-      const claims=tokens.getValidatedIdTokenClaims?.();
+      // openid-client v6 exposes validated ID-token claims via tokens.claims().
+      // Never consume raw JWT payloads or a mock-only token helper.
+      const claims=tokens.claims?.();
       if(!claims||claims.iss!==settings.issuer.replace(/\/$/,'')||!isSubject(claims.sub)||
         typeof claims.email!=='string'||claims.email_verified!==true)
         denied(403,'OIDC_CLAIMS_INVALID','Identità istituzionale non verificabile');

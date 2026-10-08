@@ -11,13 +11,14 @@ function setup(overrides={}){
  const librarian=s.get("SELECT * FROM users WHERE role='librarian'");
  const student=s.get("SELECT * FROM users WHERE role='student'");
  const faculty=s.get("SELECT * FROM users WHERE role='faculty'");
- const calls={code:0,nonce:null},state={subject:'subject-123',email:student.email,verified:true,role:'librarian'};
+ const calls={code:0,nonce:null,signatureChecks:0},state={subject:'subject-123',email:student.email,verified:true,role:'librarian'};
  const library={
   randomPKCECodeVerifier:()=> 'unique-verifier-code',
   randomNonce:()=> 'fixture-nonce',
   calculatePKCECodeChallenge:async verifier=>'challenge:'+verifier,
   randomState:()=> 'fixture-state',
   async discovery(){return {serverMetadata:()=>({issuer:environment.OIDC_ISSUER})};},
+  enableNonRepudiationChecks(){calls.signatureChecks++;},
   buildAuthorizationUrl(config,params){
     const url=new URL('https://idp.example.edu/authorize');
     Object.entries(params).forEach(([key,value])=>url.searchParams.set(key,value));calls.nonce=params.nonce;return url;
@@ -28,7 +29,7 @@ function setup(overrides={}){
     assert.equal(checks.expectedNonce,calls.nonce);
     assert.equal(checks.expectedState,url.searchParams.get('state'));
     assert.equal(checks.idTokenExpected,true);
-    return {getValidatedIdTokenClaims:()=>({
+    return {claims:()=>({
       iss:environment.OIDC_ISSUER,sub:state.subject,email:state.email,
       email_verified:state.verified,role:state.role
     })};
@@ -58,6 +59,7 @@ test('OIDC uses one-time state, PKCE, nonce and explicit database binding',async
  assert.equal(result.user.role,'student'); // never elevated by role claim
  assert.equal(service.current(result.token).role,'student');
  assert.equal(f.calls.code,1);
+ assert.equal(f.calls.signatureChecks,1);
  await fails(()=>f.oidc.finish(start.flow,auth.searchParams.get('state'),'state=x&code=test'),'OIDC_STATE_INVALID');
  assert.equal(f.calls.code,1);
  assert.equal(f.s.get("SELECT count(*) n FROM audit_events WHERE operation='oidc_login'").n,1);
