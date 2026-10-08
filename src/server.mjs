@@ -106,6 +106,7 @@ export function buildHandler({ api=service, database=s }={}) {
       if(method==='GET'&&path==='/api/staff/stats') return respond(res,api.stats(user));
       if(method==='GET'&&path==='/api/staff/users') return respond(res,api.users(user));
       if(method==='POST'&&path==='/api/staff/users'){const b=await readJson(req);return respond(res,api.createUser(user,b),201);}
+      if(method==='POST'&&path.startsWith('/api/staff/users/')&&path.endsWith('/disable')) return respond(res,api.disableUser(user,pathId(path,'/api/staff/users/','/disable')));
       if(method==='POST'&&path==='/api/staff/books'){const b=await readJson(req);return respond(res,api.addBook(user,b),201);}
       if(method==='POST'&&path==='/api/staff/checkout'){const b=await readJson(req);return respond(res,api.checkout(user,b.userId,b.bookId),201);}
       if(method==='POST'&&path==='/api/staff/return'){const b=await readJson(req);return respond(res,api.returnLoan(user,b.loanId));}

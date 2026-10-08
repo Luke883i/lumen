@@ -26,7 +26,7 @@ function freeCopies(s,bookId) {
 function promote(s,bookId) {
   let count=0;
   while(freeCopies(s,bookId)>0) {
-    const next=s.get("SELECT * FROM holds WHERE book_id=? AND status='queued' ORDER BY created_at,id LIMIT 1",bookId);
+    const next=s.get("SELECT * FROM holds WHERE book_id=? AND status='queued' ORDER BY created_at,rowid LIMIT 1",bookId);
     if(!next) break;
     s.run("UPDATE holds SET status='ready',updated_at=? WHERE id=?",now(),next.id);
     notify(s,next.user_id,'Libro pronto per il ritiro','La prenotazione e pronta. Rivolgiti al banco prestiti.','hold_ready');
@@ -62,9 +62,13 @@ export function createService(s) {
       return books.map(({copies,borrowed,reserved,...b})=>({...b,copies,available:Math.max(0,copies-borrowed-reserved),reserved,borrowed}));
     },
     book(id) {
-      const b=api.books().find(x=>x.id===id);
+      const b=s.get('SELECT * FROM books WHERE id=?',id);
       if(!b) fail(404,'NOT_FOUND','Titolo non trovato');
-      return {...b,items:s.all('SELECT c.id,c.barcode,c.shelf, CASE WHEN EXISTS(SELECT 1 FROM loans l WHERE l.copy_id=c.id AND l.status=\'active\') THEN 1 ELSE 0 END as onLoan FROM copies c WHERE c.book_id=? ORDER BY barcode',id)};
+      const copies=s.get('SELECT count(*) n FROM copies WHERE book_id=?',id).n;
+      const borrowed=s.get("SELECT count(*) n FROM loans l JOIN copies c ON c.id=l.copy_id WHERE c.book_id=? AND l.status='active'",id).n;
+      const reserved=s.get("SELECT count(*) n FROM holds WHERE book_id=? AND status='ready'",id).n;
+      const queue=s.get("SELECT count(*) n FROM holds WHERE book_id=? AND status='queued'",id).n;
+      return {...b,copies,borrowed,reserved,queue,available:Math.max(0,copies-borrowed-reserved),items:s.all('SELECT c.id,c.barcode,c.shelf, CASE WHEN EXISTS(SELECT 1 FROM loans l WHERE l.copy_id=c.id AND l.status=\'active\') THEN 1 ELSE 0 END as onLoan FROM copies c WHERE c.book_id=? ORDER BY barcode',id)};
     },
     holds(user) {
       requireRole(user,['student','faculty','librarian']);
@@ -148,6 +152,7 @@ export function createService(s) {
       const title=needed(form.title,200), author=needed(form.author,160), reason=needed(form.reason,500);
       const isbn=str(form.isbn,32);
       return s.tx(()=>{
+        if(isbn && (s.get("SELECT id FROM books WHERE isbn=? LIMIT 1",isbn) || s.get("SELECT id FROM suggestions WHERE isbn=? AND user_id=? AND status IN ('pending','approved') LIMIT 1",isbn,user.id))) fail(409,'DUPLICATE_SUGGESTION','Titolo gia presente o proposta gia attiva');
         const id=newId();
         s.run("INSERT INTO suggestions(id,user_id,title,author,isbn,reason,status,created_at) VALUES(?,?,?,?,?,?,?,?)",id,user.id,title,author,isbn,reason,'pending',now());
         notify(s,user.id,'Proposta ricevuta','La biblioteca valuterà la tua richiesta.','suggestion');
@@ -183,6 +188,19 @@ export function createService(s) {
       const id=newId();
       s.run("INSERT INTO users(id,email,name,role,passhash,created_at) VALUES(?,?,?,?,?,?)",id,email,name,role,hashPassword(form.password),now());
       return {id};
+    },
+    disableUser(user,id) {
+      requireRole(user,['librarian']);
+      return s.tx(()=>{
+        if(id===user.id) fail(409,'SELF_DISABLE','Non puoi disabilitare il tuo account');
+        const target=s.get('SELECT * FROM users WHERE id=?',id);
+        if(!target) fail(404,'NOT_FOUND','Account non trovato');
+        if(target.role==='librarian' && target.active && s.get("SELECT count(*) n FROM users WHERE role='librarian' AND active=1").n<=1) fail(409,'LAST_LIBRARIAN','Serve almeno un bibliotecario attivo');
+        s.run('UPDATE users SET active=0 WHERE id=?',id);
+        s.run('DELETE FROM sessions WHERE user_id=?',id);
+        s.run('DELETE FROM subscriptions WHERE user_id=?',id);
+        return {ok:true};
+      });
     },
     addBook(user,form) {
       requireRole(user,['librarian']);
