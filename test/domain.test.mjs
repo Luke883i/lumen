@@ -124,3 +124,37 @@ test('transaction rollback: failed issue leaves all values unchanged',()=>{
   assert.equal(s.get('SELECT count(*) n FROM holds').n,0);
   s.close();
 });
+
+test('idempotency keys replay committed receipts and reject cross-purpose reuse',()=>{
+  const {s,svc,user,book}=fixture();
+  const student=user('student'),staff=user('librarian');
+  const key='hold-stable-key-123456';
+  const a=svc.requestHold(student,book.id,key);
+  assert.deepEqual(svc.requestHold(student,book.id,key),a);
+  assert.equal(s.get('SELECT count(*) n FROM holds').n,1);
+  const other=s.all('SELECT * FROM books WHERE id<>? LIMIT 1',book.id)[0];
+  fails(()=>svc.requestHold(student,other.id,key),'IDEMPOTENCY_CONFLICT');
+  const out=svc.checkout(staff,student.id,book.id,'issue-key-123456');
+  const again=svc.checkout(staff,student.id,book.id,'issue-key-123456');
+  assert.deepEqual(out,again);
+  assert.equal(s.get("SELECT count(*) n FROM loans WHERE status='active'").n,1);
+  s.close();
+});
+test('password rotation revokes sessions and rejects stale credentials',()=>{
+  const {s,svc,user}=fixture();
+  const student=user('student');
+  const oldSession=svc.login(student.email,'Demo1234!');
+  fails(()=>svc.changePassword(student,'incorrect','changed-strong-password'),'BAD_CREDENTIALS');
+  svc.changePassword(student,'Demo1234!','changed-strong-password');
+  assert.equal(svc.current(oldSession.token),null);
+  fails(()=>svc.login(student.email,'Demo1234!'),'BAD_CREDENTIALS');
+  assert.ok(svc.login(student.email,'changed-strong-password').token);
+  s.close();
+});
+test('web push endpoints cannot redirect delivery to arbitrary hosts',()=>{
+  const {s,svc,user}=fixture();
+  const student=user('student');
+  fails(()=>svc.subscribe(student,{endpoint:'https://127.0.0.1/admin',keys:{p256dh:'AA',auth:'BB'}}),'PUSH_PROVIDER_DENIED');
+  assert.ok(svc.subscribe(student,{endpoint:'https://fcm.googleapis.com/fcm/send/abc',keys:{p256dh:'AA',auth:'BB'}}).ok);
+  s.close();
+});
