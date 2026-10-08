@@ -7,6 +7,16 @@
 </head><body>
 <a class="skip" href="#main">Vai al contenuto</a>
 <div id="root"><header class="shell"><strong>LUMEN</strong></header><main id="main" class="shell"><p>Caricamento biblioteca…</p></main></div>
-<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+<dialog id="lumen-dialog" class="lumen-dialog" aria-labelledby="dialog-title" aria-describedby="dialog-detail">
+  <div class="dialog-content">
+    <h2 id="dialog-title">Conferma operazione</h2>
+    <p id="dialog-detail">Verifica prima di proseguire.</p>
+    <form method="dialog" class="dialog-actions">
+      <button class="btn ghost" value="cancel" type="submit">Torna indietro</button>
+      <button class="btn" value="confirm" type="submit" id="dialog-confirm">Conferma</button>
+    </form>
+  </div>
+</dialog>
 <script type="module" src="/app.js"></script>
 </body></html>
