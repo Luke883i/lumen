@@ -1,6 +1,6 @@
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
-const state={user:null,csrf:null,install:null,koha:false,kohaWrite:false,kohaLoans:false,kohaReturns:false};
+const state={user:null,csrf:null,install:null,koha:false,kohaWrite:false,kohaLoans:false,kohaReturns:false,oidcEnabled:false,oidcOnly:false};
 const retryKeys=new Map();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=s=>esc(s);
@@ -131,10 +131,11 @@ async function staff(){
   if(!isStaff())return forbidden();
   const [data,users,books,suggestions]=await Promise.all([api('/api/staff/stats'),api('/api/staff/users'),api('/api/books'),api('/api/suggestions')]);
   const options=arr=>arr.map(x=>'<option value="'+esc(x.id)+'">'+t(x.name||x.title)+' ('+t(x.email||x.author)+')</option>').join('');
+  const oidcMapping=state.oidcEnabled?'<section class="section card"><h2>Collega identità istituzionale</h2><p class="fine">Inserisci il subject OIDC ufficialmente verificato dall’amministratore IdP. Non usare l’indirizzo email come subject. La modifica di una associazione esistente è bloccata.</p><form class="form" data-form="oidc-bind"><label>Account LUMEN<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label>'+field('OIDC subject (sub)','subject','ID stabile IdP',true)+'<button class="btn small" type="submit">Associa subject</button></form></section>':'';
   const kohaMapping=state.kohaWrite?'<section class="section card"><h2>Collega un account Koha</h2><p class="muted">L’email dell’account deve corrispondere a quella restituita da Koha. Nessun collegamento automatico.</p><form class="form" data-form="koha-bind"><label>Account LUMEN<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label>'+field('Identificativo patron Koha','patronId','ID numerico',true,'number')+'<button type="submit" class="btn">Verifica e collega patron</button></form><p><a data-nav href="/staff/koha-pending">Verifica operazioni Koha in sospeso →</a></p></section>':'';
   const kohaReturnDesk=state.kohaReturns?'<section class="section card"><h2>Restituzioni Koha</h2><p class="fine">La restituzione si registra nella postazione Koha, non in LUMEN. Qui puoi preparare e verificare il rientro.</p><a class="btn alt small" data-nav href="/staff/koha-returns">Apri verifiche dei rientri →</a></section>':'';
   const kohaLoanDesk=state.kohaLoans?'<section class="section card"><h2>Banco prestiti Koha</h2><p class="muted">Consegna copia soltanto dopo verifica fisica dell’articolo. Nessuna forzatura delle regole di circolazione Koha.</p><form class="form" data-form="koha-checkout"><label>Patron associato a Koha<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label>'+field('ID copia Koha (item_id)','itemId','Identificativo numerico',true,'number')+'<button class="btn" type="submit">Consegna via Koha</button></form><p><a data-nav href="/staff/koha-loans-pending">Riconcilia prestiti e rinnovi incerti →</a></p></section>':'';
-  return sectionTitle('Banco bibliotecario','Una dashboard operativa per circolazione, acquisti e comunicazioni.')+kohaMapping+kohaLoanDesk+kohaReturnDesk
+  return sectionTitle('Banco bibliotecario','Una dashboard operativa per circolazione, acquisti e comunicazioni.')+oidcMapping+kohaMapping+kohaLoanDesk+kohaReturnDesk
   +'<div class="grid section">'+[['Titoli',data.books],['Copie',data.copies],['Prestiti attivi',data.loans],['Utenti',data.users],['In coda',data.queued],['Acquisti da valutare',data.pending]].map(([k,v])=>'<div class="card"><p class="label">'+t(k)+'</p><p class="metric">'+v+'</p></div>').join('')+'</div>'
   +'<div class="layout section"><div class="card"><h2>Registra prestito</h2><form class="form" data-form="checkout"><label>Utente<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label><label>Libro<select name="bookId" required>'+options(books)+'</select></label><button class="btn" type="submit">Consegna volume</button></form></div>'
   +'<div class="card"><h2>Copia e catalogo</h2><form class="form" data-form="book">'+field('Titolo','title')+field('Autore','author')+field('ISBN','isbn','ISBN',false)+field('Materia','subject','Materia',false)+field('Scaffale','shelf','Collocazione',false)+field('Numero copie','copies','1',true,'number')+'<button class="btn" type="submit">Registra titolo e copie</button></form></div></div>'
@@ -148,7 +149,7 @@ async function staff(){
 function forbidden(){return sectionTitle('Accesso non consentito','Il tuo profilo non dispone delle autorizzazioni richieste.')+'<a class="btn" data-nav href="/">Torna alla home</a>';}
 function login(){
   if(state.user)return sectionTitle('Sei già connesso','Accedi alle tue funzioni dal menu.')+'<a data-nav class="btn" href="/me">La mia biblioteca</a>';
-  return '<div class="layout section"><div class="card"><p class="eyebrow">Accesso riservato</p><h1 style="font-size:2.5rem">Bentornato su LUMEN.</h1><p class="muted">Accedi con le credenziali fornite dalla tua biblioteca.</p><form class="form" data-form="login">'+field('Email','email','nome@universita.it',true,'email')+field('Password','password','La tua password',true,'password')+'<button class="btn" type="submit">Accedi</button></form></div><div class="card"><h2>Tre profili, una piattaforma</h2><p><strong>Studente</strong> · Catalogo, prestiti e prenotazioni.</p><p><strong>Docente</strong> · Tutto ciò che serve per lo studio e le proposte di acquisto.</p><p><strong>Bibliotecario</strong> · Banco prestiti, gestione e comunicazioni.</p><p class="fine">Nessuna registrazione pubblica: gli utenti vengono abilitati dalla biblioteca.</p></div></div>';
+  return '<div class="layout section"><div class="card"><p class="eyebrow">Accesso riservato</p><h1 style="font-size:2.5rem">Bentornato su LUMEN.</h1><p class="muted">Accedi con l’identità istituzionale o con le credenziali autorizzate dalla biblioteca.</p>'+(state.oidcEnabled?'<a class="btn" href="/api/auth/oidc/start">Accedi con Single Sign-On</a>':'')+(new URLSearchParams(location.search).has('auth_error')?'<p class="alert">Accesso istituzionale non completato. Contatta la biblioteca per verificare l’associazione dell’account.</p>':'')+(state.oidcOnly?'':'<form class="form" data-form="login">'+field('Email','email','nome@universita.it',true,'email')+field('Password','password','La tua password',true,'password')+'<button class="btn" type="submit">Accedi</button></form>')+'</div><div class="card"><h2>Tre profili, una piattaforma</h2><p><strong>Studente</strong> · Catalogo, prestiti e prenotazioni.</p><p><strong>Docente</strong> · Tutto ciò che serve per lo studio e le proposte di acquisto.</p><p><strong>Bibliotecario</strong> · Banco prestiti, gestione e comunicazioni.</p><p class="fine">Nessuna registrazione pubblica: gli utenti vengono abilitati dalla biblioteca.</p></div></div>';
 }
 async function settings(){
   if(!state.user)return login();
@@ -328,6 +329,11 @@ document.addEventListener('submit',async event=>{
       message('Ricevuta Koha #'+receipt.holdId+' riconciliata');
       await render();return;
     }
+    if(action==='oidc-bind'){
+      await api('/api/staff/oidc/bind','POST',data);
+      message('Subject istituzionale associato all’account');
+      await render();return;
+    }
     if(action==='koha-bind'){
       await api('/api/staff/koha/bind','POST',data);
       message('Identità Koha verificata e associata');
@@ -360,4 +366,4 @@ async function enablePush(){
 window.addEventListener('popstate',render);
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.install=e;const button=document.querySelector('#install');if(button)button.style.display='';});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
-(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;state.kohaLoans=!!c.koha?.loansEnabled;state.kohaReturns=!!c.koha?.returnsEnabled;}catch(e){message(e.message,true);}await render();})();
+(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;state.kohaLoans=!!c.koha?.loansEnabled;state.kohaReturns=!!c.koha?.returnsEnabled;state.oidcEnabled=!!c.identity?.oidcEnabled;state.oidcOnly=!!c.identity?.oidcOnly;}catch(e){message(e.message,true);}await render();})();
