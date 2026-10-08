@@ -48,6 +48,9 @@ test('UX-S4 real pixel boxes: hero, covers, search at 1440, 393, 320',async({pag
   await page.goto('/catalogo');
   await checkOverflow(page,'catalog '+size.width);
   await page.locator('.book-card a[data-nav]').first().click();
+  // SPA rendering is asynchronous: wait for the actual detail route/DOM,
+  // never infer completion from the navigation click alone.
+  await expect(page.locator('.cover-detail')).toBeVisible();
   const cover=(await measure(page,'.cover-detail'))[0];
   expect(cover.width).toBeLessThanOrEqual(64+eps);
   expect(cover.height).toBeLessThanOrEqual(88+eps);

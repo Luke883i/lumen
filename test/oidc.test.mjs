@@ -186,3 +186,24 @@ test('existing R5 SQLite session schema is upgraded without destroying existing 
    repeat.close();
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
+
+test('BIME R14: OIDC session cap also revokes orphan Web Push targets',async()=>{
+ const {pushKeys}=await import('./push-fixtures.mjs');
+ const f=setup(),api=createService(f.s);
+ try{
+  f.oidc.bind(f.librarian,f.student.id,'subject-123');
+  const login=async()=>{
+    const pending=await f.oidc.start();
+    const state=new URL(pending.redirect).searchParams.get('state');
+    return f.oidc.finish(pending.flow,state,'state='+encodeURIComponent(state)+'&code=fixture');
+  };
+  const oldest=await login();
+  const endpoint='https://fcm.googleapis.com/fcm/send/bime-oidc-eviction';
+  api.subscribe(f.student,{endpoint,keys:pushKeys},oldest.token);
+  assert.equal(f.s.get('SELECT count(*) n FROM subscriptions').n,1);
+  for(let i=0;i<6;i++)await login();
+  assert.equal(api.current(oldest.token),null);
+  assert.equal(f.s.get('SELECT count(*) n FROM subscriptions WHERE endpoint=?',endpoint).n,0);
+  assert.ok(f.s.get('SELECT count(*) n FROM sessions').n<=5);
+ }finally{f.s.close();}
+});
