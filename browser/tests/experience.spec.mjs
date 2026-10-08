@@ -268,3 +268,22 @@ test('UX-S3 anonymous task-first entry and secondary services stay reachable',as
  await page.getByRole('navigation',{name:'Navigazione mobile'}).locator('a[href="/catalogo"]').click();
  await expect(page.getByRole('heading',{name:'Catalogo'})).toBeVisible();
 });
+
+
+test('UX-S3 selected staff workspaces do not fetch unrelated bibliographic and identity datasets',async({page})=>{
+ await signIn(page,'librarian');
+ const requested=[];
+ page.on('request',req=>{
+   const route=new URL(req.url()).pathname;
+   if(['/api/staff/stats','/api/staff/users','/api/books','/api/suggestions'].includes(route))
+     requested.push(route);
+ });
+ await page.goto('/staff?area=comunicazioni');
+ await expect(page.locator('form[data-form="broadcast"]')).toBeVisible();
+ expect(requested).toEqual([]);
+ await page.goto('/staff?area=acquisti');
+ await expect(page.getByRole('heading',{name:'Proposte d’acquisto'})).toBeVisible();
+ expect(requested).toContain('/api/suggestions');
+ expect(requested).not.toContain('/api/staff/users');
+ expect(requested).not.toContain('/api/staff/stats');
+});

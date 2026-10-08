@@ -58,3 +58,6 @@
   .bottom-nav a span{font-size:.64rem;line-height:1.15;white-space:normal;text-align:center}
   .bottom-nav svg{width:20px;height:20px;flex-shrink:0}
 }
+
+/* Native disclosure summary requires an explicit keyboard focus indicator. */
+.nav-more summary:focus-visible,.staff-workspaces a:focus-visible,.task-link:focus-visible{outline:3px solid var(--lumen-gold);outline-offset:3px}
