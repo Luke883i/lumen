@@ -3,12 +3,17 @@
   "name": "LUMEN · Biblioteca",
   "short_name": "LUMEN",
   "lang": "it",
-  "description": "Catalogo, prestiti, prenotazioni e comunicazioni della biblioteca",
+  "dir": "ltr",
+  "description": "La tua biblioteca: catalogo, prestiti, prenotazioni e comunicazioni.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f7f5ef",
   "theme_color": "#10243a",
+  "categories": [
+    "education",
+    "books"
+  ],
   "icons": [
     {
       "src": "/icons/lumen.svg",
@@ -27,6 +32,41 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Catalogo",
+      "short_name": "Cerca",
+      "url": "/catalogo",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "I miei prestiti",
+      "short_name": "Prestiti",
+      "url": "/me",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Comunicazioni",
+      "short_name": "Avvisi",
+      "url": "/notifiche",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

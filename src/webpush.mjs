@@ -14,7 +14,9 @@ export async function beginPushWorker(s,env=process.env) {
         let success=0;
         for(const sub of subs) {
           try {
-            await webpush.sendNotification(JSON.parse(sub.payload),JSON.stringify({title:row.title,body:'Hai una nuova comunicazione dalla biblioteca.',url:'/notifiche'}),{TTL:86400});
+            await webpush.sendNotification(JSON.parse(sub.payload),JSON.stringify({
+              id:row.id,kind:row.kind,url:'/notifiche'
+            }),{TTL:86400});
             success++;
           } catch(e) {
             if(e.statusCode===404||e.statusCode===410) s.run('DELETE FROM subscriptions WHERE endpoint=?',sub.endpoint);
