@@ -39,7 +39,7 @@ test('Koha collection never becomes lendable from bibliographic copy count',()=>
   for(const mapped of [false,true,undefined]){
    for(const writeEnabled of [false,true]){
     for(const role of [null,'student','faculty','librarian']){
-     const x=invariant(projectKohaBook({id:'koha_7',copies},{configured:true,writeEnabled,mapped,role}));
+     const x=invariant(projectKohaBook({id:'koha:7',copies},{configured:true,writeEnabled,mapped,role}));
      assert.equal(x.status,'availability_unknown');
      assert.equal(x.epistemicStatus,'unknown');
      assert.match(x.label,/verificare su Koha/);
@@ -49,8 +49,10 @@ test('Koha collection never becomes lendable from bibliographic copy count',()=>
    }
   }
  }
- assert.equal(projectKohaBook({id:'koha_7',copies:1}).status,'unconfigured');
- assert.equal(projectKohaBook({id:'koha_7',copies:1}).action.enabled,false);
+ assert.equal(projectKohaBook({id:'koha:7',copies:1}).status,'unconfigured');
+ assert.equal(projectKohaBook({id:'koha:7',copies:1}).action.enabled,false);
+ assert.equal(projectKohaBook({id:'koha:7',copies:200},{configured:true,writeEnabled:true,mapped:true,role:'faculty'}).action.href,'/koha/7');
+ assert.equal(projectKohaBook({id:'koha:INVALID',copies:1},{configured:true,writeEnabled:true,mapped:true,role:'faculty'}).action.enabled,false);
  assert.equal(projectKohaBook({copies:1},{configured:true,mapped:true,writeEnabled:true,role:'faculty'}).action.enabled,false);
 });
 test('hold and loan finite state tables never grant new authority',()=>{

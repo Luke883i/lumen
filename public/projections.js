@@ -33,21 +33,24 @@ export function projectLocalBook(book,{role=null}={}){
 }
 
 export function projectKohaBook(book,{configured=false,writeEnabled=false,mapped=false,role=null}={}){
+ // Koha bibliographic IDs are namespaced as koha:<numeric biblio_id>.
+ // The route must use only the validated numeric part, never the source prefix.
  const id=normalized(book?.id);
+ const kohaId=/^koha:([1-9][0-9]*)$/.exec(id)?.[1]||'';
  const authenticated=!!actorRole(role);
- const requestable=!!configured&&!!writeEnabled&&mapped===true&&authenticated&&!!id;
+ const requestable=!!configured&&!!writeEnabled&&mapped===true&&authenticated&&!!kohaId;
  const reason=!configured?'Koha non configurato.':
    !writeEnabled?'Prenotazioni Koha non attive.':
    !authenticated?'Accedi prima di richiedere una prenotazione.':
    mapped!==true?'Identità Koha da associare o verificare.':
-   !id?'Identificativo Koha da verificare.':null;
+   !kohaId?'Identificativo Koha da verificare.':null;
  return view('book','koha.bibliographic',{
   status:configured?'availability_unknown':'unconfigured',
   epistemicStatus:configured?'unknown':'blocked',
   label:configured?'Disponibilità al prestito da verificare su Koha':'Catalogo Koha non configurato',
   helper:'Le copie catalogate non dimostrano che una copia sia prestabile o disponibile.',
   action:freeze({...attempt('Richiedi prenotazione Koha',requestable,reason),
-    href:route('/koha/',id),epistemicStatus:requestable?'conditional':'blocked'})
+    href:route('/koha/',kohaId),epistemicStatus:requestable?'conditional':'blocked'})
  });
 }
 

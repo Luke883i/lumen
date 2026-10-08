@@ -33,3 +33,7 @@ The Koha read projection is intentionally conservative; a future complete Koha a
 ## Next cuts
 
 **UX-S3** information architecture and progressive disclosure after S2; **UX-S4** measurable density and visual compression; **UX-S5** clarity/focus of CTAs and errors; **UX-S6** final composition, pairwise state audit and evidence. In parallel: real Render R10, institutional Koha/IdP R11, physical push/PWA R9c; R12 performance, R13 enterprise release.
+
+### Koha route canonicalization
+
+Koha adapter represents a bibliographic identifier as `koha:<positive integer>`; its UI route uses only the validated numeric identifier. A malformed source-scoped ID cannot enable or synthesize a Koha action. These routes remain presentation links, not remote mutation authority.
