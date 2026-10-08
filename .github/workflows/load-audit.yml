@@ -10,6 +10,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  pull-requests: write
 jobs:
   load-2000:
     runs-on: ubuntu-latest
@@ -45,12 +46,30 @@ jobs:
         with:
           k6-version: '0.49.0'
       - name: 2000 concurrent synthetic patron sessions
-        run: k6 run perf/library.k6.js
+        run: |
+          set -o pipefail
+          k6 run perf/library.k6.js 2>&1 | tee perf/k6-run.log
+      - name: Publish measured experiment output in PR 2
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if test -f perf/k6-run.log; then
+            {
+              echo '### k6 2000 VUs · commit ${{ github.sha }}'
+              echo ''
+              echo '\`\`\`text'
+              tail -n 95 perf/k6-run.log
+              echo '\`\`\`'
+            } > perf/k6-report.md
+            gh pr comment 2 --body-file perf/k6-report.md
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: lumen-load-evidence-${{ github.sha }}
           path: |
             perf/evidence.json
+            perf/k6-run.log
             /tmp/lumen-load-server.log
           if-no-files-found: warn
