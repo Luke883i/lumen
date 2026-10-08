@@ -16,7 +16,7 @@ The [product lattice](docs/PRODUCT_LATTICE.md) and [real-device acceptance matri
 
 Use `npm run dev` in a fresh Codespace and open port 3000; on an HTTPS site, follow **Installa app** in LUMEN or in the browser menu. The resulting PWA opens in a standalone browser window, not as a native APK. Notification delivery requires configured VAPID secrets, explicit user permission, compatible browser/OS support, and remains best-effort; the inbox is always authoritative.
 
-**Browser acceptance:** PR #9 adds test-only, isolated Playwright Chromium coverage for desktop and Android emulation. After `npm --prefix browser ci` and `npm --prefix browser exec -- playwright install chromium`, run `npm run test:browser`. This is optional QA; **`npm run dev` remains the sole command needed to use LUMEN in a fresh Codespace**. See [browser/README.md](browser/README.md).
+**Browser acceptance:** R9 includes test-only, isolated Playwright Chromium coverage for desktop and Android emulation. After `npm --prefix browser ci` and `npm --prefix browser exec -- playwright install chromium`, run `npm run test:browser`. This is optional QA; **`npm run dev` remains the sole command needed to use LUMEN in a fresh Codespace**. See [browser/README.md](browser/README.md).
 
 **User acceptance still to run:** physical Chrome Android/Windows installation, system notification delivery/tap, screen-reader checks, real Render canary with persistent-state restore, Koha/IdP integration and 2,000 concurrent users. Automated Chromium emulation does not replace real-device evidence.
 
