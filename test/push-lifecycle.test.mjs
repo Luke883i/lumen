@@ -89,10 +89,17 @@ test('legacy unowned subscriptions are purged during idempotent R9b migration',(
  const dir=mkdtempSync(join(tmpdir(),'lumen-r9b-'));
  const filename=join(dir,'legacy.sqlite');
  try{
+  // Start with an authentic existing LUMEN database, then reconstruct ONLY
+  // its pre-R9b subscriptions table. This preserves real users/foreign keys.
+  const original=openStore(filename);
+  bootstrap(original,{NODE_ENV:'test',LUMEN_DEMO:'1'});
+  const previous=original.get("SELECT id FROM users WHERE role='student'").id;
+  original.close();
   const old=new DatabaseSync(filename);
+  old.exec("DROP TABLE subscriptions");
   old.exec("CREATE TABLE subscriptions (endpoint TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), payload TEXT NOT NULL, created_at TEXT NOT NULL)");
   old.prepare('INSERT INTO subscriptions(endpoint,user_id,payload,created_at) VALUES(?,?,?,?)')
-    .run(endpoint('legacy'),'legacy-id',JSON.stringify(sub('legacy')),new Date().toISOString());
+    .run(endpoint('legacy'),previous,JSON.stringify(sub('legacy')),new Date().toISOString());
   old.close();
   const upgraded=openStore(filename);
   assert.equal(upgraded.all('PRAGMA table_info(subscriptions)').filter(x=>x.name==='session_hash').length,1);
