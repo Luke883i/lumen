@@ -35,6 +35,8 @@ function promote(s,bookId) {
   return count;
 }
 export function createService(s) {
+  const catalogueCache=new Map();
+  let catalogueCacheRevision=-1;
   function requireRole(user, roles) {
     if(!user) fail(401,'AUTH_REQUIRED','Effettua l’accesso');
     const current=s.get('SELECT active,role FROM users WHERE id=?',user.id);
@@ -78,6 +80,9 @@ export function createService(s) {
     logout(token) { if(token) s.run("DELETE FROM sessions WHERE token_hash=?",tokenHash(token)); },
     books(query='') {
       const q=str(query,120);
+      const currentRevision=s.get('SELECT version FROM catalogue_revision WHERE id=1').version;
+      if(currentRevision!==catalogueCacheRevision){catalogueCache.clear();catalogueCacheRevision=currentRevision;}
+      if(catalogueCache.has(q))return catalogueCache.get(q).map(row=>({...row}));
       const words=(q.normalize('NFKC').match(/[\p{L}\p{N}]+/gu)||[]).slice(0,6);
       if(q.trim() && !words.length) return [];
       const match=words.map(w=>'"'+w.toLowerCase()+'"*').join(' AND ');
@@ -85,7 +90,10 @@ export function createService(s) {
       const books=match
         ? s.all(columns+" FROM books_fts JOIN books b ON b.rowid=books_fts.rowid WHERE books_fts MATCH ? ORDER BY lower(b.title),b.id LIMIT 120",match)
         : s.all(columns+" FROM books b ORDER BY lower(b.title),b.id LIMIT 120");
-      return books.map(({copies,borrowed,reserved,...b})=>({...b,copies,available:Math.max(0,copies-borrowed-reserved),reserved,borrowed}));
+      const view=books.map(({copies,borrowed,reserved,...b})=>({...b,copies,available:Math.max(0,copies-borrowed-reserved),reserved,borrowed}));
+      if(catalogueCache.size>=80)catalogueCache.delete(catalogueCache.keys().next().value);
+      catalogueCache.set(q,view);
+      return view.map(row=>({...row}));
     },
     book(id) {
       const b=s.get('SELECT * FROM books WHERE id=?',id);

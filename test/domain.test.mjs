@@ -190,3 +190,22 @@ test('catalogue availability has covering indexes on every dependent join',()=>{
   assert.match(plan.detail,/idx_copies_book/);
   s.close();
 });
+
+test('catalogue derived cache invalidates atomically for hold, issue and return',()=>{
+  const {s,svc,user,book}=fixture();
+  const staff=user('librarian'),student=user('student');
+  const first=svc.books(book.title).find(x=>x.id===book.id);
+  const h=svc.requestHold(student,book.id);
+  const second=svc.books(book.title).find(x=>x.id===book.id);
+  assert.equal(second.available,first.available-1);
+  assert.equal(second.reserved,first.reserved+1);
+  const issued=svc.checkout(staff,student.id,book.id);
+  const third=svc.books(book.title).find(x=>x.id===book.id);
+  assert.equal(third.borrowed,first.borrowed+1);
+  assert.equal(third.reserved,first.reserved);
+  svc.returnLoan(staff,issued.id);
+  const fourth=svc.books(book.title).find(x=>x.id===book.id);
+  assert.equal(fourth.available,first.available);
+  assert.equal(fourth.borrowed,first.borrowed);
+  s.close();
+});
