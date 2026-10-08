@@ -177,7 +177,7 @@ test('FTS catalogue index supports multi-term prefix and accent-insensitive sear
   assert.equal(svc.books('Emile')[0].id,b.id);
   assert.equal(svc.books('978 1234')[0].id,b.id);
   assert.equal(svc.books('%').length,0);
-  const queryPlan=s.get("EXPLAIN QUERY PLAN SELECT b.id FROM books_fts f JOIN books b ON b.rowid=f.rowid WHERE books_fts MATCH ?",'"analisi"*');
+  const queryPlan=s.get("EXPLAIN QUERY PLAN SELECT b.id FROM books_fts JOIN books b ON b.rowid=books_fts.rowid WHERE books_fts MATCH ?",'"analisi"*');
   assert.ok(queryPlan.detail.includes('VIRTUAL TABLE INDEX'));
   s.close();
 });
