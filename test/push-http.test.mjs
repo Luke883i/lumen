@@ -59,3 +59,72 @@ test('R9b HTTP: authenticated device ownership, CSRF, cross-account rejection an
   await new Promise(resolve=>server.close(resolve));s.close();
  }
 });
+
+test('R9b HTTP: switching local accounts without explicit logout revokes old device binding',async()=>{
+ const store=openStore(':memory:');bootstrap(store,{NODE_ENV:'test',LUMEN_DEMO:'1'});
+ const api=createService(store),server=createServer(buildHandler({api,database:store}));
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const base='http://127.0.0.1:'+server.address().port;
+ const oldPublic=process.env.VAPID_PUBLIC_KEY,oldPrivate=process.env.VAPID_PRIVATE_KEY;
+ const signin=async(email,cookie)=>{
+   const r=await fetch(base+'/api/login',{method:'POST',
+     headers:{Origin:base,'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},
+     body:JSON.stringify({email,password:'Demo1234!'})});
+   assert.equal(r.status,200);
+   return {cookie:r.headers.get('set-cookie').split(';')[0],csrf:(await r.json()).csrf};
+ };
+ try{
+   process.env.VAPID_PUBLIC_KEY='fixture-only-public';
+   process.env.VAPID_PRIVATE_KEY='fixture-only-private';
+   const previous=await signin('student@lumen.local');
+   const registered=await fetch(base+'/api/push-subscription',{method:'POST',headers:{
+     Origin:base,Cookie:previous.cookie,'Content-Type':'application/json','X-CSRF-Token':previous.csrf
+   },body:JSON.stringify(subscription)});
+   assert.equal(registered.status,200);
+   assert.equal(store.get('SELECT count(*) n FROM subscriptions').n,1);
+   const replacement=await signin('faculty@lumen.local',previous.cookie);
+   assert.equal(store.get('SELECT count(*) n FROM subscriptions').n,0);
+   const previousSession=await (await fetch(base+'/api/me',{headers:{Cookie:previous.cookie}})).json();
+   assert.equal(previousSession.user,null);
+   const current=await (await fetch(base+'/api/me',{headers:{Cookie:replacement.cookie}})).json();
+   assert.equal(current.user.role,'faculty');
+ }finally{
+   if(oldPublic===undefined)delete process.env.VAPID_PUBLIC_KEY;else process.env.VAPID_PUBLIC_KEY=oldPublic;
+   if(oldPrivate===undefined)delete process.env.VAPID_PRIVATE_KEY;else process.env.VAPID_PRIVATE_KEY=oldPrivate;
+   await new Promise(resolve=>server.close(resolve));store.close();
+ }
+});
+test('R9b HTTP: an OIDC callback that replaces a browser cookie revokes old push enrollment',async()=>{
+ const store=openStore(':memory:');bootstrap(store,{NODE_ENV:'test',LUMEN_DEMO:'1'});
+ const api=createService(store),server=createServer(buildHandler({api,database:store,oidcApi:{
+   enabled:true,only:false,
+   async finish(){return api.login('faculty@lumen.local','Demo1234!');}
+ }}));
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const base='http://127.0.0.1:'+server.address().port;
+ const oldPublic=process.env.VAPID_PUBLIC_KEY,oldPrivate=process.env.VAPID_PRIVATE_KEY;
+ try{
+   process.env.VAPID_PUBLIC_KEY='fixture-only-public';
+   process.env.VAPID_PRIVATE_KEY='fixture-only-private';
+   const r=await fetch(base+'/api/login',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},
+     body:JSON.stringify({email:'student@lumen.local',password:'Demo1234!'})});
+   assert.equal(r.status,200);
+   const student={cookie:r.headers.get('set-cookie').split(';')[0],csrf:(await r.json()).csrf};
+   const create=await fetch(base+'/api/push-subscription',{method:'POST',headers:{
+     Origin:base,Cookie:student.cookie,'Content-Type':'application/json','X-CSRF-Token':student.csrf
+   },body:JSON.stringify(subscription)});
+   assert.equal(create.status,200);
+   assert.equal(store.get('SELECT count(*) n FROM subscriptions').n,1);
+   const callback=await fetch(base+'/api/auth/oidc/callback?state=fixture&code=fixture',
+     {redirect:'manual',headers:{Cookie:student.cookie+'; lumen_oidc_flow=fixture'}});
+   assert.equal(callback.status,303);
+   assert.equal(callback.headers.get('location'),'/me');
+   assert.equal(store.get('SELECT count(*) n FROM subscriptions').n,0);
+   const old=await (await fetch(base+'/api/me',{headers:{Cookie:student.cookie}})).json();
+   assert.equal(old.user,null);
+ }finally{
+   if(oldPublic===undefined)delete process.env.VAPID_PUBLIC_KEY;else process.env.VAPID_PUBLIC_KEY=oldPublic;
+   if(oldPrivate===undefined)delete process.env.VAPID_PRIVATE_KEY;else process.env.VAPID_PRIVATE_KEY=oldPrivate;
+   await new Promise(resolve=>server.close(resolve));store.close();
+ }
+});
