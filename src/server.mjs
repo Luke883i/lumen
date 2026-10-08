@@ -5,11 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { openStore, bootstrap } from './store.mjs';
 import { createService, Failure } from './service.mjs';
 import { makeKoha } from './koha.mjs';
+import { createKohaCirculation } from './koha-circulation.mjs';
 
 const s=openStore(process.env.LUMEN_DB_PATH || './data/lumen.sqlite');
 bootstrap(s);
 const service=createService(s);
 const koha=makeKoha(process.env);
+const kohaCirculation=createKohaCirculation(s,koha,process.env);
 const publicDir=resolve(fileURLToPath(new URL('../public/', import.meta.url)));
 const port=Number(process.env.PORT || 3000);
 const prod=process.env.NODE_ENV==='production';
@@ -61,7 +63,7 @@ const getPublic=async(path,res)=>{
   res.end(file);
 };
 
-export function buildHandler({ api=service, database=s, kohaApi=koha }={}) {
+export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCirculationApi=kohaCirculation }={}) {
   return async (req,res)=>{
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
@@ -91,7 +93,22 @@ export function buildHandler({ api=service, database=s, kohaApi=koha }={}) {
         return json(res,200,{user:result.user,csrf:result.csrf},{'Set-Cookie':'lumen_session='+encodeURIComponent(result.token)+'; '+cookieAttrs(43200)});
       }
       if(method==='POST'&&path==='/api/logout'){api.logout(token);return json(res,200,{ok:true},{'Set-Cookie':'lumen_session=; '+cookieAttrs(0)});}
-      if(method==='GET'&&path==='/api/config') return respond(res,{koha:{configured:kohaApi.configured,mode:'read_only'}});
+      if(method==='GET'&&path==='/api/config') return respond(res,{koha:{configured:kohaApi.configured,mode:kohaCirculationApi.enabled?'patron_holds_pilot':'read_only',holdsEnabled:kohaCirculationApi.enabled}});
+      if(method==='GET'&&path==='/api/integrations/koha/my/binding') return respond(res,kohaCirculationApi.getBinding(user));
+      if(method==='GET'&&path==='/api/integrations/koha/my/holds') return respond(res,await kohaCirculationApi.myHolds(user));
+      if(method==='POST'&&path==='/api/integrations/koha/my/holds'){
+        const b=await readJson(req);
+        return respond(res,await kohaCirculationApi.placeHold(user,b.biblioId,idempotencyKey),201);
+      }
+      if(method==='POST'&&path==='/api/staff/koha/bind'){
+        const b=await readJson(req);
+        return respond(res,await kohaCirculationApi.bind(user,b.userId,b.patronId));
+      }
+      if(method==='GET'&&path==='/api/staff/koha/pending') return respond(res,kohaCirculationApi.pending(user));
+      if(method==='POST'&&path==='/api/staff/koha/reconcile'){
+        const b=await readJson(req);
+        return respond(res,await kohaCirculationApi.reconcile(user,b.attemptId,b.holdId));
+      }
       if(method==='GET'&&path==='/api/integrations/koha/status') return respond(res,await kohaApi.status());
       if(method==='GET'&&path==='/api/integrations/koha/books') return respond(res,await kohaApi.search(url.searchParams.get('q')||''));
       if(method==='GET'&&path.startsWith('/api/integrations/koha/books/')) return respond(res,await kohaApi.detail(pathId(path,'/api/integrations/koha/books/')));

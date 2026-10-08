@@ -29,3 +29,7 @@ The host must be HTTPS (only tests may use HTTP loopback). Do **not** use a brow
 Until K2–K5 pass, **Koha integration is catalogue read-only** and enterprise circulation through Koha is **NOT implemented**.
 
 References: https://api.koha-community.org/25.11.html and https://koha-community.org/manual/latest/en/html/webservices.html
+
+## R3 extension
+
+See [KOHA_CIRCULATION.md](KOHA_CIRCULATION.md) for the feature-flagged remote hold route and staff binding. The R2 read-only statement applies when `KOHA_CIRCULATION_ENABLED` is off. Authenticated Koha holds are a separate opt-in pilot. R3 does not enable checkouts or renewals through Koha.

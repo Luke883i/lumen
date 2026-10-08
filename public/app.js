@@ -1,6 +1,6 @@
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
-const state={user:null,csrf:null,install:null,koha:false};
+const state={user:null,csrf:null,install:null,koha:false,kohaWrite:false};
 const retryKeys=new Map();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=s=>esc(s);
@@ -63,6 +63,7 @@ function header(){
   const nav=[
     ['/',ic('home')+' Home'],['/catalogo',ic('search')+' Catalogo'],
     ...(state.koha?[['/koha',ic('book')+' Catalogo Koha']]:[]),
+    ...(state.kohaWrite&&state.user?[['/koha/me',ic('clock')+' Le mie richieste Koha']]:[]),
     ...(state.user?[['/me',ic('book')+' Prestiti']]:[]),
     ...(isFaculty()?[['/acquisti',ic('cap')+' Acquisti']]:[]),
     ...(isStaff()?[['/staff',ic('settings')+' Banco']]:[]),
@@ -129,7 +130,8 @@ async function staff(){
   if(!isStaff())return forbidden();
   const [data,users,books,suggestions]=await Promise.all([api('/api/staff/stats'),api('/api/staff/users'),api('/api/books'),api('/api/suggestions')]);
   const options=arr=>arr.map(x=>'<option value="'+esc(x.id)+'">'+t(x.name||x.title)+' ('+t(x.email||x.author)+')</option>').join('');
-  return sectionTitle('Banco bibliotecario','Una dashboard operativa per circolazione, acquisti e comunicazioni.')
+  const kohaMapping=state.kohaWrite?'<section class="section card"><h2>Collega un account Koha</h2><p class="muted">L’email dell’account deve corrispondere a quella restituita da Koha. Nessun collegamento automatico.</p><form class="form" data-form="koha-bind"><label>Account LUMEN<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label>'+field('Identificativo patron Koha','patronId','ID numerico',true,'number')+'<button type="submit" class="btn">Verifica e collega patron</button></form><p><a data-nav href="/staff/koha-pending">Verifica operazioni Koha in sospeso →</a></p></section>':'';
+  return sectionTitle('Banco bibliotecario','Una dashboard operativa per circolazione, acquisti e comunicazioni.')+kohaMapping
   +'<div class="grid section">'+[['Titoli',data.books],['Copie',data.copies],['Prestiti attivi',data.loans],['Utenti',data.users],['In coda',data.queued],['Acquisti da valutare',data.pending]].map(([k,v])=>'<div class="card"><p class="label">'+t(k)+'</p><p class="metric">'+v+'</p></div>').join('')+'</div>'
   +'<div class="layout section"><div class="card"><h2>Registra prestito</h2><form class="form" data-form="checkout"><label>Utente<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label><label>Libro<select name="bookId" required>'+options(books)+'</select></label><button class="btn" type="submit">Consegna volume</button></form></div>'
   +'<div class="card"><h2>Copia e catalogo</h2><form class="form" data-form="book">'+field('Titolo','title')+field('Autore','author')+field('ISBN','isbn','ISBN',false)+field('Materia','subject','Materia',false)+field('Scaffale','shelf','Collocazione',false)+field('Numero copie','copies','1',true,'number')+'<button class="btn" type="submit">Registra titolo e copie</button></form></div></div>'
@@ -158,23 +160,48 @@ async function kohaCatalog(){
   const q=new URLSearchParams(location.search).get('q')||'';
   const result=await api('/api/integrations/koha/books?q='+encodeURIComponent(q));
   const items=result.items||[];
-  const cards=items.map(b=>'<article class="card book-card"><div class="cover">'+bookIcon+'</div><div><h3><a data-nav href="/koha/'+esc(b.id.slice(5))+'">'+t(b.title)+'</a></h3><p class="fine">'+t(b.author)+' · '+t(b.isbn||'ISBN non presente')+'</p>'+badge('Catalogo Koha · sola lettura','gray')+'</div></article>').join('');
-  return sectionTitle('Catalogo Koha','Record dalla fonte bibliografica Koha. Le prenotazioni non sono ancora integrate.')
+  const cards=items.map(b=>'<article class="card book-card"><div class="cover">'+bookIcon+'</div><div><h3><a data-nav href="/koha/'+esc(b.id.slice(5))+'">'+t(b.title)+'</a></h3><p class="fine">'+t(b.author)+' · '+t(b.isbn||'ISBN non presente')+'</p>'+badge(state.kohaWrite?'Koha · prenotazioni pilota':'Catalogo Koha · sola lettura','gray')+'</div></article>').join('');
+  return sectionTitle('Catalogo Koha',state.kohaWrite?'Fonte Koha: ricerca e prenotazioni per utenti verificati.':'Fonte Koha in sola lettura.')
     +'<form class="searchbar" data-form="koha-search"><input name="query" placeholder="Titolo, autore o ISBN" value="'+esc(q)+'" aria-label="Cerca su Koha"><button class="btn gold" type="submit">Cerca</button></form>'
     +'<section class="section"><div class="grid">'+(cards||empty('Nessun risultato da Koha.'))+'</div>'+(result.truncated?'<p class="fine">Sono disponibili altri record: la paginazione avanzata sarà introdotta nel gate K2.</p>':'')+'</section>';
 }
 async function kohaDetail(){
   const id=location.pathname.split('/')[2];
   const b=await api('/api/integrations/koha/books/'+encodeURIComponent(id));
+  let action='';
+  if(state.kohaWrite){
+    if(!state.user)action='<a class="btn" data-nav href="/accedi">Accedi per prenotare</a>';
+    else{
+      const binding=await api('/api/integrations/koha/my/binding');
+      action=binding.mapped?'<form class="form" data-form="koha-hold"><input name="biblioId" value="'+esc(id)+'" type="hidden"><p class="fine">Prenotazione gestita direttamente da Koha. La disponibilità e la posizione in coda sono determinate da Koha.</p><button class="btn" type="submit">Richiedi prenotazione Koha</button></form>'
+        :'<p class="alert">Account Koha non associato. Chiedi alla biblioteca di verificare e collegare la tua identità.</p>';
+    }
+  }
   return '<div class="page-top"><a data-nav href="/koha">← Torna a Koha</a><h1>'+t(b.title)+'</h1><p>'+t(b.author)+'</p><p>'+t(b.isbn)+'</p></div>'
-    +'<div class="card"><h2>Copie registrate: '+Number(b.copies)+'</h2><p class="alert">La disponibilità al prestito deve essere confermata nel sistema Koha. Le operazioni di circolazione non sono abilitate in questa integrazione.</p>'
+    +'<div class="card"><h2>Copie registrate: '+Number(b.copies)+'</h2><p class="alert">La disponibilità al prestito deve essere verificata su Koha; LUMEN non calcola le copie disponibili di questa collezione.</p>'+action
     +'<div class="list">'+(b.items||[]).map(c=>'<div class="row"><span>'+t(c.barcode||'Copia')+'</span><span class="fine">'+t(c.shelf)+'</span></div>').join('')+'</div></div>';
+}
+async function kohaMyHolds(){
+  if(!state.user)return login();
+  const binding=await api('/api/integrations/koha/my/binding');
+  if(!binding.mapped)return sectionTitle('Le mie prenotazioni Koha','Identità Koha non collegata.')+'<p class="alert">Contatta il bibliotecario per associare il tuo account.</p>';
+  const result=await api('/api/integrations/koha/my/holds');
+  return sectionTitle('Le mie prenotazioni Koha','Dati letti direttamente dal gestionale Koha, senza duplicazione locale.')
+    +'<div class="list section">'+(result.holds.length?result.holds.map(h=>'<article class="card"><h3>Prenotazione #'+Number(h.hold_id)+'</h3><p>Titolo Koha #'+Number(h.biblio_id)+' · Stato: '+t(h.status||'da Koha')+' · Posizione: '+t(h.priority??'—')+'</p><p class="fine">Le condizioni di ritiro e le modifiche sono governate dalla biblioteca.</p></article>').join(''):empty('Non risultano prenotazioni su Koha.'))+'</div>';
+}
+async function kohaPending(){
+  if(!isStaff())return forbidden();
+  const pending=await api('/api/staff/koha/pending');
+  return sectionTitle('Operazioni Koha da riconciliare','L’esito remoto può essere stato registrato nonostante un timeout. Nessun retry automatico.')
+    +'<div class="list section">'+(pending.length?pending.map(x=>'<article class="card"><h3>Record Koha '+Number(x.biblio_id)+'</h3><p class="fine">Patron #'+Number(x.patron_id)+' · Stato: '+t(x.state)+' · Errore: '+t(x.error_code||'non determinato')+'</p><p>Verifica il record su Koha, poi inserisci il suo identificativo autentico.</p><form class="form" data-form="koha-reconcile"><input type="hidden" name="attemptId" value="'+esc(x.id)+'">'+field('ID prenotazione Koha','holdId','ID confermato',true,'number')+'<button class="btn small" type="submit">Verifica e riconcilia</button></form></article>').join(''):empty('Nessuna operazione incerta.'))+'</div>';
 }
 async function view(){
   const path=location.pathname;
   if(path==='/')return home();
   if(path==='/catalogo')return catalog();
   if(path==='/koha'&&state.koha)return kohaCatalog();
+  if(path==='/koha/me'&&state.kohaWrite)return kohaMyHolds();
+  if(path==='/staff/koha-pending'&&state.kohaWrite)return kohaPending();
   if(path.startsWith('/koha/')&&state.koha)return kohaDetail();
   if(path.startsWith('/catalogo/'))return bookDetail();
   if(path==='/accedi')return login();
@@ -226,6 +253,22 @@ document.addEventListener('submit',async event=>{
   try{
     if(action==='search'){navigate('/catalogo?q='+encodeURIComponent(data.query||''));return;}
     if(action==='koha-search'){navigate('/koha?q='+encodeURIComponent(data.query||''));return;}
+    if(action==='koha-hold'){
+      const receipt=await api('/api/integrations/koha/my/holds','POST',data);
+      message('Koha ha confermato la prenotazione #'+receipt.holdId);
+      navigate('/koha/me');
+      return;
+    }
+    if(action==='koha-reconcile'){
+      const receipt=await api('/api/staff/koha/reconcile','POST',data);
+      message('Ricevuta Koha #'+receipt.holdId+' riconciliata');
+      await render();return;
+    }
+    if(action==='koha-bind'){
+      await api('/api/staff/koha/bind','POST',data);
+      message('Identità Koha verificata e associata');
+      await render();return;
+    }
     if(action==='change-password'){await api('/api/change-password','POST',data);state.user=null;state.csrf=null;navigate('/accedi');message('Password aggiornata. Effettua nuovamente l’accesso.');return;}
     if(action==='login'){const r=await api('/api/login','POST',data);state.user=r.user;state.csrf=r.csrf;navigate(r.user.role==='librarian'?'/staff':'/me');message('Accesso effettuato');return;}
     if(action==='hold')await api('/api/holds','POST',data);
@@ -253,4 +296,4 @@ async function enablePush(){
 window.addEventListener('popstate',render);
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.install=e;const button=document.querySelector('#install');if(button)button.style.display='';});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
-(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;}catch(e){message(e.message,true);}await render();})();
+(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;}catch(e){message(e.message,true);}await render();})();

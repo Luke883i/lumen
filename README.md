@@ -29,6 +29,18 @@ Set `KOHA_BASE_URL`, `KOHA_CLIENT_ID`, `KOHA_CLIENT_SECRET` on the server to con
 
 The separate [k6 workflow](.github/workflows/load-audit.yml) tests 2,000 synthetic authenticated sessions on a GitHub runner. This is **not** a Render/enterprise/production certification. See [load report protocol](docs/LOAD_AUDIT.md).
 
+## R3 Koha patron-hold pilot (opt-in)
+
+The independent Koha catalogue remains available in read-only mode by default. R3 adds a **feature-flagged, Koha-authoritative hold workflow**, without duplicating Koha hold records in SQLite:
+
+1. Supply `KOHA_BASE_URL`, `KOHA_CLIENT_ID`, `KOHA_CLIENT_SECRET`, `KOHA_CIRCULATION_ENABLED=1`, `KOHA_PICKUP_LIBRARY_ID=MAIN` through your secure environment.
+2. Librarian: open `/staff`, select a local user and verify its numerical Koha patron ID; exact email match required.
+3. Patron: open `/koha`, choose a title and request a hold (only after verified mapping).
+4. Patron: use `/koha/me` to see their holds *read directly from Koha*.
+5. If the Koha response is uncertain, librarian: `/staff/koha-pending`, inspect the authoritative Koha record and enter its exact hold ID to confirm. LUMEN never blindly retries an ambiguous write.
+
+See [circulation contract and limitations](docs/KOHA_CIRCULATION.md). This is a **controlled integration slice**, not a tested live production Koha deployment. Koha checkout/check-in/renew, institutional SSO, 2,000-production-concurrency, and enterprise certification remain open gates.
+
 ## Non-negotiable architectural boundaries
 
 - **Standalone mode**: self-contained lightweight single-library circulation, not a full ILS. It does **not** claim MARC cataloguing, federated OPAC, inter-library lending, fines, serials or Koha parity.
