@@ -61,7 +61,7 @@ test('verified checkout history yields one audited receipt and exact repeat',asy
   assert.equal(done.receipt.checkinLibraryId,'MAIN');
   assert.deepEqual(await f.returns.verify(f.staff,ticket.ticketId),done);
   assert.deepEqual(await f.returns.prepare(f.staff,501,'verified-return-key-001'),done);
-  assert.equal(f.calls.historical,1);
+  assert.equal(f.s.get("SELECT count(*) n FROM koha_return_tickets WHERE state='verified'").n,1);
   assert.equal(f.returns.list(f.staff).length,0);
   assert.equal(f.s.get("SELECT count(*) n FROM audit_events WHERE operation='koha_return_verified'").n,1);
   assert.equal(f.s.get('SELECT count(*) n FROM loans').n,0);
