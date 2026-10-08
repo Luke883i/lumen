@@ -61,15 +61,17 @@ if(path&&existsSync(path)){
       hasDemo=!!db.prepare("SELECT 1 FROM users WHERE email IN ('student@lumen.local','faculty@lumen.local','librarian@lumen.local') LIMIT 1").get();
       hasDemo ||= db.prepare("SELECT value FROM metadata WHERE key='demo_dataset'").get()?.value==='1';
     }catch(e){if(prod)throw e;}
-    db.close();
     record('database-integrity',integrity==='ok','SQLite PRAGMA quick_check');
     if(prod)record('database-not-demo',!hasDemo,'No demonstration account or demo marker in persistent DB');
     if(process.env.OIDC_ONLY==='1'){
       const ready=!!db.prepare("SELECT 1 FROM oidc_bindings b JOIN users u ON u.id=b.user_id WHERE u.role='librarian' AND u.active=1 LIMIT 1").get();
       record('oidc-admin-mapped',ready,'Avoid SSO-only lockout: at least one active mapped librarian required');
     }
+    db.close();
   }catch(e){record('database-readiness',false,'Could not safely verify local database: '+e.code);}
 }
+if(prod&&process.env.OIDC_ONLY==='1'&&(!path||!existsSync(path)))
+  record('oidc-admin-mapped',false,'SSO-only must not start without a persisted mapped active librarian');
 const report={product:'LUMEN',gate:'standalone_release_preflight',time:new Date().toISOString(),node:process.version,
   revision:process.env.GIT_SHA||'unbound',
   checks,openEnterpriseGates:['Live institutional IdP signature/conformance and subject lifecycle','Koha live circulation','2k VU on target hardware with writes and soak','HA and recovery drills','independent security review']};
