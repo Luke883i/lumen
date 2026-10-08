@@ -1,0 +1,56 @@
+name: R2 load evidence (synthetic)
+on:
+  push:
+    branches: [feat/lumen-runtime-r2]
+    paths:
+      - 'src/**'
+      - 'perf/**'
+      - 'scripts/seed-load.mjs'
+      - '.github/workflows/load-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  load-2000:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: test
+      LUMEN_DEMO: '0'
+      LUMEN_DB_PATH: ./data/load.sqlite
+      LOAD_USERS: '2000'
+      LOAD_BOOKS: '20000'
+      LOAD_HOLD_SECONDS: '20'
+      TARGET_URL: http://127.0.0.1:3000
+      PORT: '3000'
+      GIT_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+      - run: node scripts/seed-load.mjs
+      - name: Start actual LUMEN server
+        run: |
+          node src/server.mjs > /tmp/lumen-load-server.log 2>&1 &
+          echo $! > /tmp/lumen-load-server.pid
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:3000/api/health > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/lumen-load-server.log
+          exit 1
+      - uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: '0.49.0'
+      - name: 2000 concurrent synthetic patron sessions
+        run: k6 run perf/library.k6.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lumen-load-evidence-${{ github.sha }}
+          path: |
+            perf/evidence.json
+            /tmp/lumen-load-server.log
+          if-no-files-found: warn
