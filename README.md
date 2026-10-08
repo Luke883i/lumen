@@ -2,6 +2,22 @@
 
 LUMEN is a deployable, installable library-services PWA for patrons, faculty and librarians.
 
+## Open source, terms and acknowledgements
+
+**LUMEN original code: MIT License (proposed, subject to rights-holder approval).**
+See [LICENSE](LICENSE), [open-source use and institutional responsibilities](docs/USAGE_TERMS.md),
+[third-party package licenses and design references](docs/THIRD_PARTY_NOTICES.md),
+[contributing](CONTRIBUTING.md) and the [18-PR provenance audit](docs/PR_LINEAGE_AUDIT.md).
+The live Home has a small **Powered by Node.js + SQLite** attribution and public
+`/opensource` page with links; Koha is identified as an optional API integration
+rather than a bundled or endorsed subsystem.
+
+**The software MIT grant is not the library's patron terms of service.**
+Each operator must supply its own legal/privacy notice, policies, contact details
+and circulation rules before making a public institutional deployment.
+The lockfile SPDX audit runs as `npm run check:licenses` in CI. Confirm
+repository/asset/contributor rights before merging the license proposal.
+
 ## UX-S2 — Provenienza e viste non autorevoli
 
 Le schermate mostrano provenienza, stato e possibilità di azione a partire dalle risposte già disponibili: le disponibilità del catalogo LUMEN non vengono trasferite per inferenza a Koha; il rinnovo resta condizionato alle regole del backend; notifiche nell'inbox e consegne sul dispositivo rimangono distinte. Nessuna nuova sorgente autorevole o dipendenza di produzione. [Contratti, DoD ed esempi](docs/UX_PROJECTIONS.md).
@@ -120,8 +136,8 @@ See [OIDC.md](docs/OIDC.md) for configuration, staff binding, staging tests and 
 ## Non-negotiable architectural boundaries
 
 - **Standalone mode**: self-contained lightweight single-library circulation, not a full ILS. It does **not** claim MARC cataloguing, federated OPAC, inter-library lending, fines, serials or Koha parity.
-- **Koha mode**: future adapter gate, deliberately *not enabled*. Do not write directly to Koha's database or synchronise competing loan authorities without explicit reconciliation.
-- **Production SSO**: institutional OIDC adapter is **not implemented**. Local credential accounts are suitable only for controlled pilot usage with appropriate institutional review.
+- **Koha mode**: existing feature-flagged API adapters for catalogue, holds, loans and staff-assisted returns remain optional and require live institutional acceptance. Do not write directly to Koha's database or duplicate Koha loan authority.
+- **Production SSO**: institutional OIDC adapter exists behind configuration flags; signed-token interoperability, deprovisioning and actual institutional acceptance are not certified. Local credentials should remain limited to controlled pilots.
 - **Performance**: 2,000 active sessions are a target, not a measured capacity. Test p95 latency, throughput and consistency with realistic data before declaring the gate passed.
 - **Web Push**: optional, activated only with VAPID keys; notifications are always persisted in the in-app inbox. Browser permission and subscription are user-controlled.
 - **Email**: not part of this version; no claim of delivery is made.
@@ -134,4 +150,4 @@ TLS (Render provides it), persistent disk, private credential provisioning, secu
 
 ## Technology
 
-Node.js built-ins (`node:http`, `node:sqlite`, `node:crypto`), a small optional `web-push` dependency, standards-based PWA (HTML/CSS/ES modules/Service Worker). No client build chain. This is an intentional minimum-dependency choice, not a claim that handwritten integration code is cost-free.
+Node.js built-ins (`node:http`, `node:sqlite`, `node:crypto`), optional `web-push` (MPL-2.0) and `openid-client` (MIT) packages, standards-based PWA (HTML/CSS/ES modules/Service Worker). No client build chain. This is an intentional minimum-dependency choice, not a claim that handwritten integration code is cost-free.
