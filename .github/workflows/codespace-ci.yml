@@ -1,0 +1,27 @@
+name: Verify real Codespaces image
+on:
+  push:
+    branches: [feat/lumen-runtime-r2]
+    paths:
+      - '.devcontainer/**'
+      - 'scripts/bootstrap.sh'
+      - 'scripts/doctor.sh'
+      - '.github/workflows/codespace-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  devcontainer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Boot devcontainer and verify Node/npm in container
+        uses: devcontainers/ci@v0.3
+        with:
+          push: never
+          runCmd: |
+            bash scripts/doctor.sh
+            npm ci
+            npm run check
+            npm test
