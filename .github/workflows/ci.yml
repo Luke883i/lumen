@@ -1,4 +1,7 @@
 name: CI
+permissions:
+  contents: read
+  pull-requests: write
 on:
   push:
   pull_request:
@@ -15,4 +18,12 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm install
       - run: npm run check
-      - run: npm test
+      - name: Run domain and HTTP tests
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee /tmp/lumen-test-report.log
+      - name: Attach failing test report to PR
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr comment 1 --body-file /tmp/lumen-test-report.log
