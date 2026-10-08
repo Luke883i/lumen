@@ -77,3 +77,7 @@ Implemented as a separate OFF-by-default R5 feature: staff-only return ticket pr
 OpenID Connect Authorization Code+PKCE with server-side state/nonce validation uses pinned openid-client 6.8.8. OIDC subject mapping is explicit, unique, issuer-scoped and not self-provisioned. Database RBAC remains authoritative. Test suite mocks signed-claim output of client, preserving state and replay checks.
 
 Live institutional IdP interoperability, signature verification using REAL IdP JWKS, user lifecycle alignment, front/back-channel logout, session revocation across services, accessibility and rollout are OPEN. R6 is NOT enterprise identity certification.
+
+## R7 — Reproducible Codespaces and Render pilot deployment contract
+
+The canonical boot is `npm run dev` in a fresh Node 24 Codespace, with postCreate `npm ci`. The Render Blueprint pins Node 24.21.0, build `npm ci && npm run check && npm test`, persistent /var/data, prestart production preflight, health probe, and secure first administrator. `npm run verify:boot` exercises the real npm commands on isolated DBs; `npm run verify:deploy` statically checks the Blueprint. A live Render instance, restart persistence, Koha/IdP, offsite backups, HA and 2,000 concurrent production requests remain blocked. See [BOOT_DEPLOY.md](BOOT_DEPLOY.md).

@@ -2,28 +2,32 @@
 
 LUMEN is a deployable, installable library-services PWA for patrons, faculty and librarians.
 
-## Start in GitHub Codespaces
+## One-command Codespaces boot
 
-1. Open this repository in a Codespace (the devcontainer uses Node 24).
-2. If the Codespace existed before this commit, run **Codespaces: Rebuild Container** in the VS Code Command Palette (`Ctrl+Shift+P`) to apply the Node 24 devcontainer. A repository update alone cannot install Node into an already-running container.
-3. Check `node --version` and `npm --version`; both are checked by the devcontainer bootstrap.
-4. Run `npm run dev`. If `npm` is unavailable, run `bash scripts/doctor.sh`; use Rebuild Container (Full Rebuild if necessary).
-5. Open forwarded port **3000**. Use the seeded local demonstration accounts:
-   - `student@lumen.local` / `Demo1234!`
-   - `faculty@lumen.local` / `Demo1234!`
-   - `librarian@lumen.local` / `Demo1234!`
+1. From this repo choose **Code → Codespaces → Create codespace on main** (after PR #7 is merged). A clean Codespace uses the Node 24 devcontainer and runs `npm ci` automatically. Existing Codespaces created with an older image require **Codespaces: Rebuild Container**.
+2. In the Codespaces terminal, run the familiar command:
 
-Demonstration data is **enabled only** when `LUMEN_DEMO=1` and `NODE_ENV` is not `production`. Never use demonstration credentials on a public service.
+```bash
+npm run dev
+```
 
-## Production on Render
+3. Open the forwarded port **3000** (keep port visibility **Private**, since demo accounts are intentionally seeded). Demo users: `student@lumen.local`, `faculty@lumen.local`, `librarian@lumen.local` — each password `Demo1234!`.
 
-Connect the repo to a Render Blueprint (`render.yaml`). Render provisions a Node service and a **persistent disk** (billable). Set `ADMIN_EMAIL`, `ADMIN_PASSWORD` and optionally `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`. The service uses `/var/data/lumen.sqlite`; never run production on Render's ephemeral filesystem. Seed only one librarian account from `ADMIN_*` on the first start. Add books, copies and patrons from the librarian interface.
+If the terminal reports `npm: command not found`, use **Codespaces: Rebuild Container**, then `bash scripts/doctor.sh`. A plain `git pull` cannot install a missing runtime into a previously created container.
 
-`bash scripts/bootstrap.sh` verifies the environment and installs dependencies, `npm run preflight` checks the local release prerequisites, `npm run start` runs the server, `npm test` runs deterministic domain/API tests, `npm run check` checks JS syntax. A health endpoint is available at `/api/health`.
+For reproducibility, run `npm run verify:boot`: it starts actual `npm run dev` and `npm start` servers with isolated temporary SQLite databases and verifies health, PWA, catalogue, login, and session. Run `npm run verify:deploy` for the blueprint contract.
 
-## Koha read-only catalogue bridge
+## Deploy on Render — standalone pilot
 
-Set `KOHA_BASE_URL`, `KOHA_CLIENT_ID`, `KOHA_CLIENT_SECRET` on the server to connect a Koha 25.11 bibliographic catalog with OAuth2; open `/koha` from the navigation. This integration is explicitly **read-only**: Koha holds, renewals and checkouts are not implemented. See [Koha integration gates](docs/KOHA.md).
+Connect `main` in **Render → New → Blueprint**, selecting this repository's `render.yaml`. Enter a non-demo `ADMIN_EMAIL` and a strong `ADMIN_PASSWORD` (12+ characters) when prompted. Render provisions a paid **Starter** Node.js web service with a 1 GB persistent disk at `/var/data`. It builds with `npm ci && npm run check && npm test`, then runs `npm start` (which now invokes the production preflight automatically).
+
+After Render shows **Live**, open `https://<your-service>.onrender.com/api/health`, confirm `status: ok` and `db: true`, then use the administrator credentials to sign in and create real users/books. No demonstration dataset is seeded. Push notifications, live Koha and institutional OIDC are optional, separately configured features; enable none until each acceptance gate is met.
+
+**This is a single-instance SQLite pilot, not a high-availability ILS deployment or a 2,000-concurrent-user certification.** Disks cannot be shared by Render replicas and cause a short deployment interruption. Follow the exact environment and rollback procedure in [BOOT_DEPLOY.md](docs/BOOT_DEPLOY.md). <escape></escape>
+
+## Koha catalogue and opt-in circulation bridge
+
+Set `KOHA_BASE_URL`, `KOHA_CLIENT_ID`, `KOHA_CLIENT_SECRET` on the server to connect a Koha 25.11 bibliographic catalog with OAuth2; open `/koha` from the navigation. The catalogue is read-only by default. Additional Koha holds, checkout/renewal and verified-return workflows exist behind independent feature flags, with live-system qualification still outstanding. See [Koha integration gates](docs/KOHA.md).
 
 ## Load audit
 
@@ -39,7 +43,7 @@ The independent Koha catalogue remains available in read-only mode by default. R
 4. Patron: use `/koha/me` to see their holds *read directly from Koha*.
 5. If the Koha response is uncertain, librarian: `/staff/koha-pending`, inspect the authoritative Koha record and enter its exact hold ID to confirm. LUMEN never blindly retries an ambiguous write.
 
-See [circulation contract and limitations](docs/KOHA_CIRCULATION.md). This is a **controlled integration slice**, not a tested live production Koha deployment. Koha checkout/check-in/renew, institutional SSO, 2,000-production-concurrency, and enterprise certification remain open gates.
+See [circulation contract and limitations](docs/KOHA_CIRCULATION.md). This is a **controlled integration slice**, not a tested live production Koha deployment. Live Koha checkout and return validation, institutional IdP acceptance, 2,000-production-concurrency, and enterprise certification remain open gates.
 
 ## R4 controlled Koha loan pilot
 
@@ -51,7 +55,7 @@ Koha warnings, blockers and confirmation requirements stop automated issuance: n
 See [R4 loan contracts, verification and DoD](docs/KOHA_LOANS.md).
 
 DO NOT enable R4 on public production without testing your real Koha instance and operator permissions.
-Returns/check-ins, institutional SSO and enterprise scale/recovery certification remain unfinished.
+Direct check-in via LUMEN, live institutional IdP acceptance and enterprise scale/recovery certification remain unfinished.
 
 ## R5 staff-assisted Koha return verification
 
