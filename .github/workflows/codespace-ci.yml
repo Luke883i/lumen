@@ -1,0 +1,22 @@
+name: Verify Codespaces Node image
+on:
+  push:
+    branches: [feat/lumen-runtime-r2]
+    paths:
+      - '.devcontainer/**'
+      - 'scripts/bootstrap.sh'
+      - 'scripts/doctor.sh'
+      - '.github/workflows/codespace-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  node-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect exact devcontainer base image
+        run: |
+          docker run --rm -v "$PWD:/workspace" -w /workspace mcr.microsoft.com/devcontainers/javascript-node:24-bookworm             bash -lc 'bash scripts/doctor.sh && npm ci && npm run check && npm test'

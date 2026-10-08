@@ -36,13 +36,45 @@ const ddl = [
   "CREATE TABLE IF NOT EXISTS subscriptions (endpoint TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), payload TEXT NOT NULL, created_at TEXT NOT NULL)",
   "CREATE INDEX IF NOT EXISTS idx_holds_queue ON holds(book_id,status,created_at,id)",
   "CREATE INDEX IF NOT EXISTS idx_loans_user ON loans(user_id,status)",
-  "CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+  "CREATE INDEX IF NOT EXISTS idx_copies_book ON copies(book_id)",
+  "CREATE INDEX IF NOT EXISTS idx_loans_active_copy ON loans(copy_id) WHERE status='active'",
+  "CREATE INDEX IF NOT EXISTS idx_holds_by_book_status ON holds(book_id,status)",
+  "CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS catalogue_revision (id INTEGER PRIMARY KEY CHECK(id=1), version INTEGER NOT NULL)",
+  "INSERT OR IGNORE INTO catalogue_revision(id,version) VALUES(1,0)",
+  "CREATE TRIGGER IF NOT EXISTS revision_books_insert AFTER INSERT ON books BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TRIGGER IF NOT EXISTS revision_books_update AFTER UPDATE ON books BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TRIGGER IF NOT EXISTS revision_books_delete AFTER DELETE ON books BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TRIGGER IF NOT EXISTS revision_copies_insert AFTER INSERT ON copies BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TRIGGER IF NOT EXISTS revision_copies_update AFTER UPDATE ON copies BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TRIGGER IF NOT EXISTS revision_copies_delete AFTER DELETE ON copies BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TRIGGER IF NOT EXISTS revision_holds_insert AFTER INSERT ON holds BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TRIGGER IF NOT EXISTS revision_holds_update AFTER UPDATE ON holds BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TRIGGER IF NOT EXISTS revision_holds_delete AFTER DELETE ON holds BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TRIGGER IF NOT EXISTS revision_loans_insert AFTER INSERT ON loans BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TRIGGER IF NOT EXISTS revision_loans_update AFTER UPDATE ON loans BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TRIGGER IF NOT EXISTS revision_loans_delete AFTER DELETE ON loans BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
+  "CREATE TABLE IF NOT EXISTS idempotency (user_id TEXT NOT NULL, key TEXT NOT NULL, operation TEXT NOT NULL, payload_hash TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(user_id,key))",
+  "CREATE TABLE IF NOT EXISTS audit_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT NOT NULL, operation TEXT NOT NULL, request_hash TEXT NOT NULL, receipt_hash TEXT NOT NULL, idempotency_key TEXT, occurred_at TEXT NOT NULL)",
+  "CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_events(occurred_at DESC)",
+  "CREATE VIRTUAL TABLE IF NOT EXISTS books_fts USING fts5(title,author,isbn,subject,content='books',content_rowid='rowid',tokenize='unicode61 remove_diacritics 2')",
+  "CREATE TRIGGER IF NOT EXISTS books_fts_ai AFTER INSERT ON books BEGIN INSERT INTO books_fts(rowid,title,author,isbn,subject) VALUES(new.rowid,new.title,new.author,new.isbn,new.subject); END",
+  "CREATE TRIGGER IF NOT EXISTS books_fts_ad AFTER DELETE ON books BEGIN INSERT INTO books_fts(books_fts,rowid,title,author,isbn,subject) VALUES('delete',old.rowid,old.title,old.author,old.isbn,old.subject); END",
+  "CREATE TRIGGER IF NOT EXISTS books_fts_au AFTER UPDATE ON books BEGIN INSERT INTO books_fts(books_fts,rowid,title,author,isbn,subject) VALUES('delete',old.rowid,old.title,old.author,old.isbn,old.subject); INSERT INTO books_fts(rowid,title,author,isbn,subject) VALUES(new.rowid,new.title,new.author,new.isbn,new.subject); END"
 ];
 
 export function openStore(path = './data/lumen.sqlite') {
   if (path !== ':memory:') mkdirSync(dirname(resolve(path)), { recursive: true });
   const db = new DatabaseSync(path);
   for (const sql of ddl) db.exec(sql);
+  if (!db.prepare("SELECT 1 FROM metadata WHERE key='catalog_fts_v1'").get()) {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec("INSERT INTO books_fts(books_fts) VALUES('rebuild')");
+      db.prepare("INSERT INTO metadata(key,value) VALUES('catalog_fts_v1','built')").run();
+      db.exec('COMMIT');
+    } catch(e) { db.exec('ROLLBACK'); throw e; }
+  }
   const store = {
     db,
     get(sql, ...params) { return db.prepare(sql).get(...params); },
@@ -72,6 +104,12 @@ function addAccount(s, { email, name, role, password }) {
 }
 
 export function bootstrap(s, env = process.env) {
+  // A demo DB must never be reused on an internet-facing production service.
+  const isDemo = s.get("SELECT value FROM metadata WHERE key='demo_dataset'")?.value === '1' ||
+    !!s.get("SELECT 1 FROM users WHERE email IN ('student@lumen.local','faculty@lumen.local','librarian@lumen.local') LIMIT 1");
+  if (env.NODE_ENV === 'production' && (isDemo || env.LUMEN_DEMO === '1')) {
+    throw new Error('REFUSING PRODUCTION START: demonstration dataset or LUMEN_DEMO enabled');
+  }
   if (s.get("SELECT count(*) as n FROM users").n > 0) return;
   if (env.NODE_ENV === 'production') {
     if (!env.ADMIN_EMAIL || !env.ADMIN_PASSWORD || env.ADMIN_PASSWORD.length < 12) {
@@ -87,6 +125,7 @@ export function bootstrap(s, env = process.env) {
     return;
   }
   s.tx(() => {
+    s.run("INSERT OR REPLACE INTO metadata(key,value) VALUES('demo_dataset','1')");
     addAccount(s, { email: 'student@lumen.local', name: 'Alex Studente', role: 'student', password: 'Demo1234!' });
     addAccount(s, { email: 'faculty@lumen.local', name: 'Giulia Docente', role: 'faculty', password: 'Demo1234!' });
     addAccount(s, { email: 'librarian@lumen.local', name: 'Sara Bibliotecaria', role: 'librarian', password: 'Demo1234!' });

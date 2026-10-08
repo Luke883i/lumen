@@ -36,8 +36,13 @@ test('HTTP auth, same-origin, CSRF, and patron authorisation',async()=>{
   const badCsrf=await fetch(host+'/api/holds',{...base,body:JSON.stringify({bookId:book.id})});
   assert.equal(badCsrf.status,403);
   const goodHeaders={...base.headers,'X-CSRF-Token':data.csrf};
-  const hold=await fetch(host+'/api/holds',{...base,headers:goodHeaders,body:JSON.stringify({bookId:book.id})});
+  const replayHeaders={...goodHeaders,'Idempotency-Key':'hold-receipt-12345678'};
+  const hold=await fetch(host+'/api/holds',{...base,headers:replayHeaders,body:JSON.stringify({bookId:book.id})});
   assert.equal(hold.status,201);
+  const first=await hold.json();
+  const replay=await fetch(host+'/api/holds',{...base,headers:replayHeaders,body:JSON.stringify({bookId:book.id})});
+  assert.equal(replay.status,201);
+  assert.deepEqual(await replay.json(),first);
   const duplicate=await fetch(host+'/api/holds',{...base,headers:goodHeaders,body:JSON.stringify({bookId:book.id})});
   assert.equal(duplicate.status,409);
   const forbidden=await fetch(host+'/api/suggestions',{...base,headers:goodHeaders,body:JSON.stringify({title:'X',author:'Y',reason:'Z'})});
@@ -48,4 +53,23 @@ test('HTTP auth, same-origin, CSRF, and patron authorisation',async()=>{
   assert.equal(logout.status,200);
   const blocked=await fetch(host+'/api/holds',{headers:{Cookie:cookie}});
   assert.equal(blocked.status,401);
+});
+
+test('staff mutation audit is permission-scoped and omits raw data',async()=>{
+  const login=async email=>{
+    const r=await fetch(host+'/api/login',{method:'POST',headers:{'Content-Type':'application/json',Origin:host},
+      body:JSON.stringify({email,password:'Demo1234!'})});
+    assert.equal(r.status,200);return {body:await r.json(),cookie:r.headers.get('set-cookie').split(';')[0]};
+  };
+  const student=await login('student@lumen.local');
+  const forbidden=await fetch(host+'/api/staff/audit',{headers:{Cookie:student.cookie}});
+  assert.equal(forbidden.status,403);
+  const staff=await login('librarian@lumen.local');
+  const result=await fetch(host+'/api/staff/audit?limit=10',{headers:{Cookie:staff.cookie}});
+  assert.equal(result.status,200);
+  const entries=await result.json();
+  assert.ok(Array.isArray(entries));
+  assert.ok(entries.length>=1);
+  assert.ok(entries.some(x=>x.operation==='hold'));
+  assert.ok(entries.every(x=>!('payload' in x)&&!('password' in x)));
 });

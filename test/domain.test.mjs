@@ -124,3 +124,124 @@ test('transaction rollback: failed issue leaves all values unchanged',()=>{
   assert.equal(s.get('SELECT count(*) n FROM holds').n,0);
   s.close();
 });
+
+test('idempotency keys replay committed receipts and reject cross-purpose reuse',()=>{
+  const {s,svc,user,book}=fixture();
+  const student=user('student'),staff=user('librarian');
+  const key='hold-stable-key-123456';
+  const a=svc.requestHold(student,book.id,key);
+  assert.deepEqual(svc.requestHold(student,book.id,key),a);
+  assert.equal(s.get('SELECT count(*) n FROM holds').n,1);
+  const other=s.all('SELECT * FROM books WHERE id<>? LIMIT 1',book.id)[0];
+  fails(()=>svc.requestHold(student,other.id,key),'IDEMPOTENCY_CONFLICT');
+  const out=svc.checkout(staff,student.id,book.id,'issue-key-123456');
+  const again=svc.checkout(staff,student.id,book.id,'issue-key-123456');
+  assert.deepEqual(out,again);
+  assert.equal(s.get("SELECT count(*) n FROM loans WHERE status='active'").n,1);
+  s.close();
+});
+test('password rotation revokes sessions and rejects stale credentials',()=>{
+  const {s,svc,user}=fixture();
+  const student=user('student');
+  const oldSession=svc.login(student.email,'Demo1234!');
+  fails(()=>svc.changePassword(student,'incorrect','changed-strong-password'),'BAD_CREDENTIALS');
+  svc.changePassword(student,'Demo1234!','changed-strong-password');
+  assert.equal(svc.current(oldSession.token),null);
+  fails(()=>svc.login(student.email,'Demo1234!'),'BAD_CREDENTIALS');
+  assert.ok(svc.login(student.email,'changed-strong-password').token);
+  s.close();
+});
+test('web push endpoints cannot redirect delivery to arbitrary hosts',()=>{
+  const {s,svc,user}=fixture();
+  const student=user('student');
+  fails(()=>svc.subscribe(student,{endpoint:'https://127.0.0.1/admin',keys:{p256dh:'AA',auth:'BB'}}),'PUSH_PROVIDER_DENIED');
+  assert.ok(svc.subscribe(student,{endpoint:'https://fcm.googleapis.com/fcm/send/abc',keys:{p256dh:'AA',auth:'BB'}}).ok);
+  s.close();
+});
+
+test('multiple simultaneous sessions per account are supported but capped',()=>{
+  const {s,svc,user}=fixture();
+  const student=user('student');
+  const sessions=Array.from({length:5},()=>svc.login(student.email,'Demo1234!'));
+  assert.equal(sessions.filter(x=>svc.current(x.token)).length,5);
+  const sixth=svc.login(student.email,'Demo1234!');
+  assert.equal(svc.current(sessions[0].token),null);
+  assert.ok(svc.current(sixth.token));
+  s.close();
+});
+
+test('FTS catalogue index supports multi-term prefix and accent-insensitive searches',()=>{
+  const {s,svc,user}=fixture(),staff=user('librarian');
+  const b=svc.addBook(staff,{title:'Analisi matematica avanzata',author:'Émile Dupré',subject:'Calcolo',isbn:'978-1234',copies:1});
+  assert.equal(svc.books('Analisi matem')[0].id,b.id);
+  assert.equal(svc.books('Emile')[0].id,b.id);
+  assert.equal(svc.books('978 1234')[0].id,b.id);
+  assert.equal(svc.books('%').length,0);
+  const queryPlan=s.get("EXPLAIN QUERY PLAN SELECT b.id FROM books_fts JOIN books b ON b.rowid=books_fts.rowid WHERE books_fts MATCH ?",'"analisi"*');
+  assert.ok(queryPlan.detail.includes('VIRTUAL TABLE INDEX'));
+  s.close();
+});
+
+test('catalogue availability has covering indexes on every dependent join',()=>{
+  const {s}=fixture();
+  const ix=new Set(s.all("SELECT name FROM sqlite_master WHERE type='index'").map(x=>x.name));
+  for (const x of ['idx_copies_book','idx_loans_active_copy','idx_holds_by_book_status']) assert.ok(ix.has(x),'missing '+x);
+  const plan=s.get('EXPLAIN QUERY PLAN SELECT count(*) FROM copies WHERE book_id=?','sample-book');
+  assert.match(plan.detail,/idx_copies_book/);
+  s.close();
+});
+
+test('catalogue derived cache invalidates atomically for hold, issue and return',()=>{
+  const {s,svc,user,book}=fixture();
+  const staff=user('librarian'),student=user('student');
+  const first=svc.books(book.title).find(x=>x.id===book.id);
+  const h=svc.requestHold(student,book.id);
+  const second=svc.books(book.title).find(x=>x.id===book.id);
+  assert.equal(second.available,first.available-1);
+  assert.equal(second.reserved,first.reserved+1);
+  const issued=svc.checkout(staff,student.id,book.id);
+  const third=svc.books(book.title).find(x=>x.id===book.id);
+  assert.equal(third.borrowed,first.borrowed+1);
+  assert.equal(third.reserved,first.reserved);
+  svc.returnLoan(staff,issued.id);
+  const fourth=svc.books(book.title).find(x=>x.id===book.id);
+  assert.equal(fourth.available,first.available);
+  assert.equal(fourth.borrowed,first.borrowed);
+  s.close();
+});
+
+test('production refuses prior demo database even when accounts already exist',()=>{
+  const s=openStore(':memory:');
+  bootstrap(s,{NODE_ENV:'test',LUMEN_DEMO:'1'});
+  assert.equal(s.get("SELECT value FROM metadata WHERE key='demo_dataset'").value,'1');
+  assert.throws(()=>bootstrap(s,{NODE_ENV:'production',ADMIN_EMAIL:'admin@example.edu',ADMIN_PASSWORD:'a-very-long-secret'}),/REFUSING PRODUCTION START/);
+  assert.throws(()=>bootstrap(s,{NODE_ENV:'production',LUMEN_DEMO:'1'}),/REFUSING PRODUCTION START/);
+  s.close();
+});
+test('production accepts existing non-demo accounts without reseeding',()=>{
+  const s=openStore(':memory:');
+  bootstrap(s,{NODE_ENV:'production',ADMIN_EMAIL:'admin@example.edu',ADMIN_PASSWORD:'a-very-long-secret'});
+  bootstrap(s,{NODE_ENV:'production'});
+  assert.equal(s.get('SELECT count(*) n FROM users').n,1);
+  s.close();
+});
+
+test('audit is atomic, append-only in app API, and excludes failed/replayed operations',()=>{
+  const {s,svc,user,book}=fixture(),staff=user('librarian'),student=user('student');
+  const key='audit-hold-request-00001';
+  const first=svc.requestHold(student,book.id,key);
+  svc.requestHold(student,book.id,key);
+  assert.equal(svc.audit(staff).length,1);
+  const event=svc.audit(staff)[0];
+  assert.equal(event.operation,'hold');
+  assert.equal(event.actor_id,student.id);
+  assert.equal(event.idempotency_key,key);
+  assert.match(event.request_hash,/^[a-f0-9]{64}$/);
+  assert.match(event.receipt_hash,/^[a-f0-9]{64}$/);
+  fails(()=>svc.requestHold(student,book.id,'different-key-000001'),'DUPLICATE_HOLD');
+  assert.equal(svc.audit(staff).length,1);
+  fails(()=>svc.audit(student),'FORBIDDEN');
+  svc.cancelHold(student,first.id);
+  assert.equal(svc.audit(staff).length,2);
+  s.close();
+});

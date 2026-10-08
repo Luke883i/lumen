@@ -37,3 +37,9 @@ UNVERIFIED = external dependency or production environment not exercised.
 BLOCKED = cannot claim until missing gate passes.
 
 Production-ready, 2,000 concurrent, Koha-integrated, institutional SSO, email-delivery and proof-grade are currently **UNVERIFIED / BLOCKED**.
+
+## Dependency and replay contract
+Production builds use npm ci with a committed lockfile and pinned Node 24.21.0. A supplied Idempotency-Key (12-100 safe characters) is scoped to a user and payload; committed results are replayed verbatim, mismatched reuses are rejected with 409. Critical write receipts and business state persist in one SQLite transaction. The PWA reuses its request key on network failure for identical payloads.
+
+## R2 semantic addition
+Demo database reuse in production is refused (marker or known demo accounts). Receipt-bearing domain mutations append actor/operation/request-hash/receipt-hash to audit_events atomically; never claim this is a complete external compliance log. GET /api/staff/audit is librarian-only. The write saturation profile validates 2,000 independent accounts and unique hold receipts, no orphan holds or queue over-allocation. Detailed gates: [RELEASE_GATES](RELEASE_GATES.md).

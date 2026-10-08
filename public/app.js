@@ -1,6 +1,7 @@
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
-const state={user:null,csrf:null,install:null};
+const state={user:null,csrf:null,install:null,koha:false};
+const retryKeys=new Map();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=s=>esc(s);
 const bookIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7c-3-3-7-3-10-2v14c3-1 7-1 10 2m0-14c3-3 7-3 10-2v14c-3-1-7-1-10 2M12 7v14"/></svg>';
@@ -29,7 +30,10 @@ const routeLink=(route,label,active)=>{
 };
 async function api(path,method='GET',body) {
   const options={method,credentials:'same-origin',headers:{}};
+  const signature=method!=='GET'?JSON.stringify([path,method,body??{}]):null;
   if(method!=='GET'){
+    options.headers['Idempotency-Key']=retryKeys.get(signature)||crypto.randomUUID();
+    retryKeys.set(signature,options.headers['Idempotency-Key']);
     options.headers['Content-Type']='application/json';
     if(state.csrf) options.headers['X-CSRF-Token']=state.csrf;
     options.body=JSON.stringify(body??{});
@@ -38,6 +42,7 @@ async function api(path,method='GET',body) {
   try{r=await fetch(path,options);}
   catch{throw new Error('Servizio non raggiungibile. Riprova quando sei online.');}
   const data=await r.json();
+  if(signature) retryKeys.delete(signature);
   if(!r.ok) throw new Error(data.error?.message||'Operazione non riuscita');
   return data;
 }
@@ -57,6 +62,7 @@ function header(){
   const path=location.pathname;
   const nav=[
     ['/',ic('home')+' Home'],['/catalogo',ic('search')+' Catalogo'],
+    ...(state.koha?[['/koha',ic('book')+' Catalogo Koha']]:[]),
     ...(state.user?[['/me',ic('book')+' Prestiti']]:[]),
     ...(isFaculty()?[['/acquisti',ic('cap')+' Acquisti']]:[]),
     ...(isStaff()?[['/staff',ic('settings')+' Banco']]:[]),
@@ -144,13 +150,32 @@ async function settings(){
   const cfg=await api('/api/push-config');
   const status=cfg.enabled?'Le notifiche browser sono disponibili, previa autorizzazione.':'La push non è configurata sul server; la inbox resta disponibile.';
   return sectionTitle('Impostazioni','Il tuo account e le preferenze di comunicazione.')
-    +'<div class="layout section"><div class="card"><h2>Profilo</h2><p><strong>'+t(state.user.name)+'</strong><br>'+t(state.user.email)+'<br>'+badge({student:'Studente',faculty:'Docente',librarian:'Bibliotecario'}[state.user.role])+'</p>'+btn('Esci','logout','','ghost')+'</div>'
+    +'<div class="layout section"><div class="card"><h2>Profilo</h2><p><strong>'+t(state.user.name)+'</strong><br>'+t(state.user.email)+'<br>'+badge({student:'Studente',faculty:'Docente',librarian:'Bibliotecario'}[state.user.role])+'</p>'+btn('Esci','logout','','ghost')+'<hr class="divider"><form class="form" data-form="change-password"><h3>Cambia password</h3>'+field('Password attuale','oldPassword','',true,'password')+field('Nuova password (12+ caratteri)','newPassword','',true,'password')+'<button class="btn small" type="submit">Aggiorna password</button></form></div>'
     +'<div class="card"><h2>Notifiche</h2><p class="muted">'+t(status)+'</p>'+(cfg.enabled?btn('Attiva notifiche push','enable-push','','alt'):'')+'<p class="fine">Puoi installare questa web app dal menu del browser (Installa app/Aggiungi alla schermata Home).</p><button class="btn alt small" type="button" data-click="install" id="install" style="display:none">Installa LUMEN</button></div></div>';
+}
+
+async function kohaCatalog(){
+  const q=new URLSearchParams(location.search).get('q')||'';
+  const result=await api('/api/integrations/koha/books?q='+encodeURIComponent(q));
+  const items=result.items||[];
+  const cards=items.map(b=>'<article class="card book-card"><div class="cover">'+bookIcon+'</div><div><h3><a data-nav href="/koha/'+esc(b.id.slice(5))+'">'+t(b.title)+'</a></h3><p class="fine">'+t(b.author)+' · '+t(b.isbn||'ISBN non presente')+'</p>'+badge('Catalogo Koha · sola lettura','gray')+'</div></article>').join('');
+  return sectionTitle('Catalogo Koha','Record dalla fonte bibliografica Koha. Le prenotazioni non sono ancora integrate.')
+    +'<form class="searchbar" data-form="koha-search"><input name="query" placeholder="Titolo, autore o ISBN" value="'+esc(q)+'" aria-label="Cerca su Koha"><button class="btn gold" type="submit">Cerca</button></form>'
+    +'<section class="section"><div class="grid">'+(cards||empty('Nessun risultato da Koha.'))+'</div>'+(result.truncated?'<p class="fine">Sono disponibili altri record: la paginazione avanzata sarà introdotta nel gate K2.</p>':'')+'</section>';
+}
+async function kohaDetail(){
+  const id=location.pathname.split('/')[2];
+  const b=await api('/api/integrations/koha/books/'+encodeURIComponent(id));
+  return '<div class="page-top"><a data-nav href="/koha">← Torna a Koha</a><h1>'+t(b.title)+'</h1><p>'+t(b.author)+'</p><p>'+t(b.isbn)+'</p></div>'
+    +'<div class="card"><h2>Copie registrate: '+Number(b.copies)+'</h2><p class="alert">La disponibilità al prestito deve essere confermata nel sistema Koha. Le operazioni di circolazione non sono abilitate in questa integrazione.</p>'
+    +'<div class="list">'+(b.items||[]).map(c=>'<div class="row"><span>'+t(c.barcode||'Copia')+'</span><span class="fine">'+t(c.shelf)+'</span></div>').join('')+'</div></div>';
 }
 async function view(){
   const path=location.pathname;
   if(path==='/')return home();
   if(path==='/catalogo')return catalog();
+  if(path==='/koha'&&state.koha)return kohaCatalog();
+  if(path.startsWith('/koha/')&&state.koha)return kohaDetail();
   if(path.startsWith('/catalogo/'))return bookDetail();
   if(path==='/accedi')return login();
   if(!state.user)return login();
@@ -200,6 +225,8 @@ document.addEventListener('submit',async event=>{
   const submit=form.querySelector('button[type="submit"]');if(submit)submit.disabled=true;
   try{
     if(action==='search'){navigate('/catalogo?q='+encodeURIComponent(data.query||''));return;}
+    if(action==='koha-search'){navigate('/koha?q='+encodeURIComponent(data.query||''));return;}
+    if(action==='change-password'){await api('/api/change-password','POST',data);state.user=null;state.csrf=null;navigate('/accedi');message('Password aggiornata. Effettua nuovamente l’accesso.');return;}
     if(action==='login'){const r=await api('/api/login','POST',data);state.user=r.user;state.csrf=r.csrf;navigate(r.user.role==='librarian'?'/staff':'/me');message('Accesso effettuato');return;}
     if(action==='hold')await api('/api/holds','POST',data);
     if(action==='suggest')await api('/api/suggestions','POST',data);
@@ -226,4 +253,4 @@ async function enablePush(){
 window.addEventListener('popstate',render);
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.install=e;const button=document.querySelector('#install');if(button)button.style.display='';});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
-(async()=>{try{const m=await api('/api/me');state.user=m.user;state.csrf=m.csrf;}catch(e){message(e.message,true);}await render();})();
+(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;}catch(e){message(e.message,true);}await render();})();

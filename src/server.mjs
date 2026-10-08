@@ -4,10 +4,12 @@ import { resolve, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openStore, bootstrap } from './store.mjs';
 import { createService, Failure } from './service.mjs';
+import { makeKoha } from './koha.mjs';
 
 const s=openStore(process.env.LUMEN_DB_PATH || './data/lumen.sqlite');
 bootstrap(s);
 const service=createService(s);
+const koha=makeKoha(process.env);
 const publicDir=resolve(fileURLToPath(new URL('../public/', import.meta.url)));
 const port=Number(process.env.PORT || 3000);
 const prod=process.env.NODE_ENV==='production';
@@ -59,7 +61,7 @@ const getPublic=async(path,res)=>{
   res.end(file);
 };
 
-export function buildHandler({ api=service, database=s }={}) {
+export function buildHandler({ api=service, database=s, kohaApi=koha }={}) {
   return async (req,res)=>{
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
@@ -74,6 +76,7 @@ export function buildHandler({ api=service, database=s }={}) {
         if(method!=='GET'&&method!=='HEAD') throw new Failure(405,'METHOD_NOT_ALLOWED','Metodo non consentito');
         return await getPublic(path,res);
       }
+      const idempotencyKey=req.headers['idempotency-key']||null;
       const token=cookieToken(req);
       const user=api.current(token);
       if(method!=='GET'&&method!=='HEAD') {
@@ -88,32 +91,38 @@ export function buildHandler({ api=service, database=s }={}) {
         return json(res,200,{user:result.user,csrf:result.csrf},{'Set-Cookie':'lumen_session='+encodeURIComponent(result.token)+'; '+cookieAttrs(43200)});
       }
       if(method==='POST'&&path==='/api/logout'){api.logout(token);return json(res,200,{ok:true},{'Set-Cookie':'lumen_session=; '+cookieAttrs(0)});}
+      if(method==='GET'&&path==='/api/config') return respond(res,{koha:{configured:kohaApi.configured,mode:'read_only'}});
+      if(method==='GET'&&path==='/api/integrations/koha/status') return respond(res,await kohaApi.status());
+      if(method==='GET'&&path==='/api/integrations/koha/books') return respond(res,await kohaApi.search(url.searchParams.get('q')||''));
+      if(method==='GET'&&path.startsWith('/api/integrations/koha/books/')) return respond(res,await kohaApi.detail(pathId(path,'/api/integrations/koha/books/')));
       if(method==='GET'&&path==='/api/books') return respond(res,api.books(url.searchParams.get('q')||''));
       if(method==='GET'&&path.startsWith('/api/books/')) return respond(res,api.book(pathId(path,'/api/books/')));
+      if(method==='POST'&&path==='/api/change-password'){const b=await readJson(req);return respond(res,api.changePassword(user,b.oldPassword,b.newPassword));}
       if(method==='GET'&&path==='/api/holds') return respond(res,api.holds(user));
-      if(method==='POST'&&path==='/api/holds') {const b=await readJson(req);return respond(res,api.requestHold(user,b.bookId),201);}
-      if(method==='POST'&&path.startsWith('/api/holds/')&&path.endsWith('/cancel')) return respond(res,api.cancelHold(user,pathId(path,'/api/holds/','/cancel')));
+      if(method==='POST'&&path==='/api/holds') {const b=await readJson(req);return respond(res,api.requestHold(user,b.bookId,idempotencyKey),201);}
+      if(method==='POST'&&path.startsWith('/api/holds/')&&path.endsWith('/cancel')) return respond(res,api.cancelHold(user,pathId(path,'/api/holds/','/cancel'),idempotencyKey));
       if(method==='GET'&&path==='/api/loans') return respond(res,api.loans(user));
-      if(method==='POST'&&path.startsWith('/api/loans/')&&path.endsWith('/renew')) return respond(res,api.renew(user,pathId(path,'/api/loans/','/renew')));
+      if(method==='POST'&&path.startsWith('/api/loans/')&&path.endsWith('/renew')) return respond(res,api.renew(user,pathId(path,'/api/loans/','/renew'),idempotencyKey));
       if(method==='GET'&&path==='/api/suggestions') return respond(res,api.suggestions(user));
-      if(method==='POST'&&path==='/api/suggestions'){const b=await readJson(req);return respond(res,api.suggest(user,b),201);}
-      if(method==='POST'&&path.startsWith('/api/suggestions/')&&path.endsWith('/review')){const b=await readJson(req);return respond(res,api.reviewSuggestion(user,pathId(path,'/api/suggestions/','/review'),b.status));}
+      if(method==='POST'&&path==='/api/suggestions'){const b=await readJson(req);return respond(res,api.suggest(user,b,idempotencyKey),201);}
+      if(method==='POST'&&path.startsWith('/api/suggestions/')&&path.endsWith('/review')){const b=await readJson(req);return respond(res,api.reviewSuggestion(user,pathId(path,'/api/suggestions/','/review'),b.status,idempotencyKey));}
       if(method==='GET'&&path==='/api/notifications') return respond(res,api.notifyList(user));
       if(method==='POST'&&path.startsWith('/api/notifications/')&&path.endsWith('/read')) return respond(res,api.readNotification(user,pathId(path,'/api/notifications/','/read')));
       if(method==='GET'&&path==='/api/push-config') return respond(res,{enabled:!!(process.env.VAPID_PUBLIC_KEY&&process.env.VAPID_PRIVATE_KEY),publicKey:process.env.VAPID_PUBLIC_KEY||''});
       if(method==='POST'&&path==='/api/push-subscription'){const b=await readJson(req);return respond(res,api.subscribe(user,b));}
       if(method==='DELETE'&&path==='/api/push-subscription'){const b=await readJson(req);return respond(res,api.unsubscribe(user,b.endpoint));}
+      if(method==='GET'&&path==='/api/staff/audit') return respond(res,api.audit(user,url.searchParams.get('limit')));
       if(method==='GET'&&path==='/api/staff/stats') return respond(res,api.stats(user));
       if(method==='GET'&&path==='/api/staff/users') return respond(res,api.users(user));
       if(method==='POST'&&path==='/api/staff/users'){const b=await readJson(req);return respond(res,api.createUser(user,b),201);}
       if(method==='POST'&&path.startsWith('/api/staff/users/')&&path.endsWith('/disable')) return respond(res,api.disableUser(user,pathId(path,'/api/staff/users/','/disable')));
-      if(method==='POST'&&path==='/api/staff/books'){const b=await readJson(req);return respond(res,api.addBook(user,b),201);}
-      if(method==='POST'&&path==='/api/staff/checkout'){const b=await readJson(req);return respond(res,api.checkout(user,b.userId,b.bookId),201);}
-      if(method==='POST'&&path==='/api/staff/return'){const b=await readJson(req);return respond(res,api.returnLoan(user,b.loanId));}
-      if(method==='POST'&&path==='/api/staff/broadcast'){const b=await readJson(req);return respond(res,api.broadcast(user,b));}
+      if(method==='POST'&&path==='/api/staff/books'){const b=await readJson(req);return respond(res,api.addBook(user,b,idempotencyKey),201);}
+      if(method==='POST'&&path==='/api/staff/checkout'){const b=await readJson(req);return respond(res,api.checkout(user,b.userId,b.bookId,idempotencyKey),201);}
+      if(method==='POST'&&path==='/api/staff/return'){const b=await readJson(req);return respond(res,api.returnLoan(user,b.loanId,idempotencyKey));}
+      if(method==='POST'&&path==='/api/staff/broadcast'){const b=await readJson(req);return respond(res,api.broadcast(user,b,idempotencyKey));}
       throw new Failure(404,'NOT_FOUND','Endpoint inesistente');
     } catch(error) {
-      const status=error instanceof Failure?error.status:500;
+      const status=error instanceof Failure || error?.code?.startsWith('KOHA_') ? (error.status||503) : 500;
       if(status===500) console.error(JSON.stringify({level:'error',code:'INTERNAL',message:error.message}));
       if(!res.headersSent) json(res,status,{error:{code:error.code||'INTERNAL',message:status===500?'Errore interno del servizio':error.message}});
       else res.end();
