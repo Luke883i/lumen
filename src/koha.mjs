@@ -50,13 +50,13 @@ export function makeKoha(config=process.env,transport=fetch){
   return {
     configured:true,
     async patron(id){
-      if(!/^[1-9]\\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo Koha non valido',400);
+      if(!/^[1-9]\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo Koha non valido',400);
       const patron=await get('/api/v1/patrons/'+id);
       if(!patron||!Number.isSafeInteger(patron.patron_id))throw new KohaError('KOHA_SCHEMA','Identità Koha non conforme');
       return {patron_id:patron.patron_id,email:str(patron.email,254),cardnumber:str(patron.cardnumber,100)};
     },
     async patronHolds(id){
-      if(!/^[1-9]\\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo Koha non valido',400);
+      if(!/^[1-9]\d{0,11}$/.test(String(id)))throw new KohaError('KOHA_ID_INVALID','Identificativo Koha non valido',400);
       const result=await get('/api/v1/holds?patron_id='+id+'&_per_page=100');
       if(!Array.isArray(result))throw new KohaError('KOHA_SCHEMA','Prenotazioni Koha non conformi');
       if(result.length>=100)throw new KohaError('KOHA_PAGINATION','Troppe prenotazioni per una risposta verificabile');
@@ -65,8 +65,8 @@ export function makeKoha(config=process.env,transport=fetch){
         cancellation_date:row.cancellation_date||null}));
     },
     async placeHold({patronId,biblioId,pickupLibraryId}){
-      if(!/^[1-9]\\d{0,11}$/.test(String(patronId))||!/^[1-9]\\d{0,11}$/.test(String(biblioId))||
-        !/^[\\w-]{1,20}$/.test(String(pickupLibraryId)))throw new KohaError('KOHA_INPUT_INVALID','Prenotazione Koha non valida',400);
+      if(!/^[1-9]\d{0,11}$/.test(String(patronId))||!/^[1-9]\d{0,11}$/.test(String(biblioId))||
+        !/^[\w-]{1,20}$/.test(String(pickupLibraryId)))throw new KohaError('KOHA_INPUT_INVALID','Prenotazione Koha non valida',400);
       const authorization=await token();
       const result=await request('/api/v1/holds',{method:'POST',
         headers:{Authorization:'Bearer '+authorization,Accept:'application/json','Content-Type':'application/json'},
