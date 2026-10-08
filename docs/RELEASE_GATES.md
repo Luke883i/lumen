@@ -89,3 +89,9 @@ Render `autoDeployTrigger: checksPass` waits for GitHub checks; a public `/api/v
 ## R8 — UI experience, PWA install and notifications (feature-complete candidate)
 
 Implemented: deterministic install/permission helper with test-covered platform branches; LUMEN CSS primitives, native dialog, user-specific push consent states, account logout subscription opt-out, SW safe-click same-origin focus and lock-screen privacy, manifest shortcuts and offline shell. Browser install is a browser-controlled prompt (or manual Chrome menu action), not native APK. Web Push requires VAPID. A real Android and Windows Chrome acceptance test and WCAG review are still BLOCKED; no production enterprise label follows from a green Node CI.
+
+## R9 — Browser E2E acceptance (PR #9)
+
+`browser/` is an isolated test-only npm package with pinned `@playwright/test@1.64.0` and lockfile. GitHub Actions starts the actual `npm run dev` runtime on ephemeral in-memory demo SQLite, exercises desktop Chromium and Android emulation, and archives traces/screenshots on failure. Verified dimensions: public home/search, install-prompt dismissal, student reservation and modal cancellation/confirmation, faculty acquisitions, librarian desk, roles/access boundaries, push-unconfigured fallback, mobile overflow and offline shell.
+
+A green automated browser test is **not** physical Android launcher installation, Windows app-shell integration, real Chrome OS push consent/delivery or WCAG audit. R9 real-device acceptance in `docs/UX_ACCEPTANCE.md` remains BLOCKED until device-bound evidence. R10 Render live and R11 real Koha/IdP are independent workstreams; R12 sustained 2,000 concurrency and R13 release signoff must not be inferred.

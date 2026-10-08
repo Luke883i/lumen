@@ -8,11 +8,13 @@ The [product lattice](docs/PRODUCT_LATTICE.md) and [real-device acceptance matri
 
 Use `npm run dev` in a fresh Codespace and open port 3000; on an HTTPS site, follow **Installa app** in LUMEN or in the browser menu. The resulting PWA opens in a standalone browser window, not as a native APK. Notification delivery requires configured VAPID secrets, explicit user permission, compatible browser/OS support, and remains best-effort; the inbox is always authoritative.
 
-**User acceptance still to run:** real Chrome Android/Windows install, permission and notification click, keyboard/screen-reader checks, and full Render canary with exact SHA. Tests in CI verify source contracts and server PWA assets; they do not replace real-device acceptance.
+**Browser acceptance:** PR #9 adds test-only, isolated Playwright Chromium coverage for desktop and Android emulation. After `npm --prefix browser ci` and `npm --prefix browser exec -- playwright install chromium`, run `npm run test:browser`. This is optional QA; **`npm run dev` remains the sole command needed to use LUMEN in a fresh Codespace**. See [browser/README.md](browser/README.md).
+
+**User acceptance still to run:** physical Chrome Android/Windows installation, system notification delivery/tap, screen-reader checks, real Render canary with persistent-state restore, Koha/IdP integration and 2,000 concurrent users. Automated Chromium emulation does not replace real-device evidence.
 
 ## One-command Codespaces boot
 
-1. From this repo choose **Code → Codespaces → Create codespace on main** (after PR #7 is merged). A clean Codespace uses the Node 24 devcontainer and runs `npm ci` automatically. Existing Codespaces created with an older image require **Codespaces: Rebuild Container**.
+1. From this repo choose **Code → Codespaces → Create codespace on main**. A clean Codespace uses the Node 24 devcontainer and runs `npm ci` automatically. Existing Codespaces created with an older image require **Codespaces: Rebuild Container**.
 2. In the Codespaces terminal, run the familiar command:
 
 ```bash

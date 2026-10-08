@@ -133,3 +133,13 @@ test('offline service worker serves shell without inventing catalogue data',asyn
     await expect(page.locator('#toast')).toContainText(/non raggiungibile|online/i);
   }finally{await context.setOffline(false);}
 });
+
+test('student cannot open faculty acquisition UI or access librarian APIs',async({page})=>{
+  await signIn(page,'student');
+  await page.goto('/acquisti');
+  await expect(page.locator('form[data-form="suggest"]')).toHaveCount(0);
+  await page.goto('/staff');
+  await expect(page.locator('form[data-form="broadcast"]')).toHaveCount(0);
+  const response=await page.request.get('/api/staff/stats');
+  expect(response.status()).toBe(403);
+});
