@@ -1,3 +1,4 @@
+import {roleNavigation,activeNavigation,taskLinks,staffAreaFromSearch,STAFF_AREAS} from './navigation.js';
 import {libraryCopy,installExperience,pushExperience,actionConfirmation,localHoldResult,localStatus,localActionFeedback,localClickFeedback} from './experience.js';
 import {projectLocalBook,projectKohaBook,projectLocalHold,projectLocalLoan,projectAcquisition,projectNotification,projectPatron,projectKohaOperation} from './projections.js';
 const root=document.querySelector('#root');
@@ -86,24 +87,29 @@ function field(label,name,placeholder='',required=true,type='text'){
   return '<label>'+t(label)+'<input type="'+type+'" name="'+name+'" placeholder="'+esc(placeholder)+'" '+(required?'required':'')+'></label>';
 }
 function formSearch(value='') {return '<form class="searchbar" data-form="search"><label class="sr" for="catalog-search" style="position:absolute;left:-9999px">Ricerca catalogo</label><input id="catalog-search" name="query" value="'+esc(value)+'" placeholder="Titolo, autore, ISBN, materia…" aria-label="Cerca nel catalogo"><button class="btn gold" type="submit">'+ic('search')+' Cerca</button></form>';}
+function navigationContext(){
+  return {role:state.user?.role||null,authenticated:!!state.user,
+    koha:state.koha,kohaWrite:state.kohaWrite,kohaLoans:state.kohaLoans};
+}
+function taskHub(title='Azioni utili'){
+  const items=taskLinks(navigationContext());
+  return '<section class="section task-hub" aria-label="'+t(title)+'"><div class="section-head"><h2>'+t(title)+'</h2></div>'
+    +'<div class="task-list">'+items.map(item=>'<a class="task-link" data-nav href="'+esc(item.path)+'"><span><strong>'+t(item.label)+'</strong><small>'+t(item.detail)+'</small></span><span aria-hidden="true">→</span></a>').join('')+'</div></section>';
+}
 function header(){
-  const path=location.pathname;
-  const nav=[
-    ['/',ic('home')+' Home'],['/catalogo',ic('search')+' Catalogo'],
-    ...(state.koha?[['/koha',ic('book')+' Catalogo Koha']]:[]),
-    ...(state.kohaWrite&&state.user?[['/koha/me',ic('clock')+' Le mie richieste Koha']]:[]),
-    ...(state.kohaLoans&&state.user?[['/koha/loans',ic('book')+' Prestiti Koha']]:[]),
-    ...(state.user?[['/me',ic('book')+' Prestiti']]:[]),
-    ...(isFaculty()?[['/acquisti',ic('cap')+' Acquisti']]:[]),
-    ...(isStaff()?[['/staff',ic('settings')+' Banco']]:[]),
-    ...(state.user?[['/notifiche',ic('bell')+' Avvisi']]:[])
-  ];
-  const current=p=>path===p||(p!=='/'&&path.startsWith(p+'/'));
-  const linkNav=nav.map(([p,label])=>routeLink(p,label,current(p))).join('');
-  const account=state.user?routeLink('/impostazioni',ic('user')+' '+t(state.user.name.split(' ')[0]),current('/impostazioni')):routeLink('/accedi','Accedi',current('/accedi'));
-  const logo='<a class="brand" data-nav href="/"><svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#10243a"/><path d="M8 15c6-1 10 1 12 4 2-3 6-5 12-4v15c-6-1-10 1-12 4-2-3-6-5-12-4Z" fill="none" stroke="#f7f5ef" stroke-width="2"/><circle cx="20" cy="10" r="4" fill="#d5a646"/></svg>LUMEN</a>';
-  const bottom=nav.filter(([p])=>['/','/catalogo','/me','/notifiche','/staff','/acquisti'].includes(p)).slice(0,5).map(([p,label])=>routeLink(p,label,current(p))).join('');
-  return '<header class="site-header shell">'+logo+'<nav class="nav" aria-label="Navigazione principale">'+linkNav+account+'</nav></header><nav class="bottom-nav" aria-label="Navigazione mobile">'+bottom+'</nav>';
+  const {primary,secondary}=roleNavigation(navigationContext());
+  const here=location.pathname;
+  const link=item=>routeLink(item.path,ic(item.icon)+' '+t(item.label),activeNavigation(here,item.path));
+  const primaryDesktop=primary.map(item=>link(item)).join('');
+  const bottom=primary.map(item=>'<a data-nav href="'+esc(item.path)+'" '+(activeNavigation(here,item.path)?'aria-current="page"':'')+'>'+ic(item.icon)+'<span>'+t(item.label)+'</span></a>').join('');
+  const more=secondary.length?'<details class="nav-more"><summary>Altri servizi</summary><div class="nav-more-menu">'
+    +secondary.map(item=>routeLink(item.path,t(item.label),activeNavigation(here,item.path))).join('')+'</div></details>':'';
+  const account=state.user?routeLink('/impostazioni',ic('user')+' '+t(state.user.name.split(' ')[0]),here==='/impostazioni')
+    :routeLink('/accedi','Accedi',here==='/accedi');
+  const logo='<a class="brand" data-nav href="/"><svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#10243a"/><path d="M8 15c6-1 10 1 12 4 2-3 6-5 12-4v15c-6-1-10 1-12 4-2-3-6-5-12-4Z" fill="none" stroke="#f7f5ef" stroke-width="2"/><circle cx="20" cy="10" r="4" fill="#d5a646"/></svg>LUMEN</a>';
+  return '<header class="site-header shell">'+logo
+    +'<nav class="nav" aria-label="Navigazione principale">'+primaryDesktop+more+account+'</nav></header>'
+    +'<nav class="bottom-nav" aria-label="Navigazione mobile">'+bottom+'</nav>';
 }
 function footer(){return '<footer class="shell footer"><div class="row"><span><strong>LUMEN</strong> · Il tuo spazio per la conoscenza</span><span>Servizi bibliotecari · <a data-nav href="/installazione">Installa app</a> · <a data-nav href="/impostazioni">Impostazioni</a></span></div></footer>';}
 function bookCard(b){
@@ -114,10 +120,7 @@ function bookCard(b){
 async function home(){
   const books=await api('/api/books');
   return '<section class="hero"><div><p class="eyebrow">La tua biblioteca, ovunque</p><h1>Ogni libro apre una possibilità.</h1><p>'+t(libraryCopy.services)+'</p>'+formSearch()+'<p class="fine" style="margin-top:16px"><a data-nav href="/installazione" style="color:#f0d68d;text-decoration:underline">Porta LUMEN sul tuo dispositivo →</a></p>'+'</div><div class="hero-art">'+bookIcon+'</div></section>'
-  +'<section class="section"><div class="section-head"><h2>Un luogo, tanti servizi</h2></div><div class="grid">'
-  +'<article class="card service-card">'+ic('search')+'<h3>Esplora il patrimonio</h3><p class="muted">Cerca per autore, titolo, ISBN o materia e verifica la disponibilità nel catalogo LUMEN.</p></article>'
-  +'<article class="card service-card">'+ic('clock')+'<h3>Segui le prenotazioni</h3><p class="muted">Invia una prenotazione e verifica se il volume è pronto o in coda.</p></article>'
-  +'<article class="card service-card">'+ic('cap')+'<h3>Sostieni la ricerca</h3><p class="muted">I docenti possono proporre nuovi acquisti e seguirne l'+'&#39;'+'iter.</p></article></div></section>'
+  +taskHub('Cosa puoi fare')
   +'<section class="section"><div class="section-head"><h2>Dal catalogo</h2><a class="btn alt small" data-nav href="/catalogo">Vedi tutti →</a></div><div class="grid">'+(books.length?books.slice(0,3).map(bookCard).join(''):empty('Il catalogo sarà disponibile a breve.'))+'</div></section>'
   +'<section class="section"><div class="card"><h2>La biblioteca e LUMEN</h2><p>'+t(libraryCopy.context)+'</p><p>LUMEN è il punto di accesso digitale ai servizi bibliotecari: non sostituisce i sistemi gestionali della biblioteca e mantiene separati gli esiti delle integrazioni esterne.</p><p class="fine">Sedi, orari, contatti e condizioni di prestito saranno indicati dalla biblioteca prima della pubblicazione ufficiale.</p></div></section>';
 }
@@ -141,6 +144,8 @@ async function myLibrary(){
   const [holds,loans]=await Promise.all([api('/api/holds'),api('/api/loans')]);
   const active=loans.filter(l=>l.status==='active'),pending=holds.filter(h=>['queued','ready'].includes(h.status));
   return sectionTitle('La mia biblioteca','Consulta lo stato dei prestiti e delle prenotazioni LUMEN.')
+  +'<div class="section"><a class="fine" data-nav href="/catalogo">← Cerca altri titoli</a></div>'
+  +((state.koha||state.kohaWrite||state.kohaLoans)?taskHub('Servizi collegati'):'')
   +'<div class="grid section"><div class="card"><p class="label">Prestiti attivi</p><p class="metric">'+active.length+'</p></div><div class="card"><p class="label">Prenotazioni aperte</p><p class="metric">'+pending.length+'</p></div><div class="card"><p class="label">Prossima scadenza</p><p class="metric" style="font-size:1.35rem">'+(active.length?humanDate(active.map(l=>l.due_at).sort()[0]):'Nessuna')+'</p></div></div>'
   +'<section class="section"><h2>Prestiti</h2><div class="list">'+(loans.length?loans.map(l=>'<article class="card row space"><div><h3>'+t(l.title)+'</h3><p class="fine">Scadenza '+humanDate(l.due_at)+' · '+t(l.barcode)+'</p>'+badge(projectLocalLoan(l).label,l.status==='active'?'':'gray')+'</div>'+(projectLocalLoan(l).action.enabled?btn(projectLocalLoan(l).action.label,'renew',l.id,'alt'):'')+'</article>').join(''):empty('Non hai ancora prestiti.'))+'</div></section>'
   +'<section class="section"><h2>Prenotazioni</h2><div class="list">'+(holds.length?holds.map(h=>'<article class="card row space"><div><h3>'+t(h.title)+'</h3><p class="fine">Richiesta '+humanDate(h.created_at)+'</p>'+badge(projectLocalHold(h).label,h.status==='queued'?'warn':h.status==='cancelled'?'gray':'')+'</div>'+(projectLocalHold(h).action.enabled?btn(projectLocalHold(h).action.label,'cancel-hold',h.id,'ghost'):'')+'</article>').join(''):empty('Nessuna prenotazione.'))+'</div></section>';
