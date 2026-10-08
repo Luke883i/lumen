@@ -227,7 +227,9 @@ test('UX-S3 librarian task workspaces disclose only the selected operation',asyn
 test('UX-S3 role navigation remains <=5 and privileged pages are inaccessible to patrons',async({page,isMobile})=>{
  for(const role of ['student','faculty','librarian']){
    await signIn(page,role);
-   const mobile=page.getByRole('navigation',{name:'Navigazione mobile'});
+   // Inspect primary-route contracts in BOTH projects. getByRole omits
+   // CSS-hidden mobile navigation on desktop by design.
+   const mobile=page.locator('nav.bottom-nav');
    const routes=await mobile.locator('a').evaluateAll(links=>links.map(x=>x.getAttribute('href')));
    expect(routes.length).toBeLessThanOrEqual(5);
    expect(new Set(routes).size).toBe(routes.length);
@@ -265,7 +267,7 @@ test('UX-S3 anonymous task-first entry and secondary services stay reachable',as
    await more.locator('summary').click();
    await expect(more.getByRole('link',{name:'Installa LUMEN'})).toBeVisible();
  }
- await page.getByRole('navigation',{name:'Navigazione mobile'}).locator('a[href="/catalogo"]').click();
+ await page.locator(isMobile?'nav.bottom-nav a[href="/catalogo"]':'nav.nav a[href="/catalogo"]').click();
  await expect(page.getByRole('heading',{name:'Catalogo'})).toBeVisible();
 });
 
