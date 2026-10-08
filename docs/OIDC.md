@@ -23,3 +23,7 @@ To make local password login unavailable, set OIDC_ONLY=1 only AFTER mapping and
 ## DoD and outstanding evidence
 
 Mock IdP domain/HTTP suite: state expiry/replay, CSRF, role non-escalation, duplicate binding, email_verified, issuer claims, active-user requirement. Real institutional staging IdP, token/signature interoperability, logout and account deprovisioning, high availability and security audit remain OPEN. This is a staged SSO pilot, not enterprise SSO certification.
+
+## Live metadata verification (read-only)
+
+With institutional OIDC environment credentials configured and the exact registered callback, run `GIT_SHA=$(git rev-parse HEAD) npm run oidc:smoke`. The script validates HTTPS issuer/authorization/token/JWKS endpoints, support for response_type code and explicit S256 PKCE metadata. No interactive login or token exchange is performed. PASS is metadata evidence only; production login, JWT signature, claim mapping, session revocation, provider outages and IdP lifecycle still require a controlled staging acceptance test.
