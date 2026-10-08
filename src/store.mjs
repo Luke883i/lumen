@@ -55,6 +55,8 @@ const ddl = [
   "CREATE TRIGGER IF NOT EXISTS revision_loans_update AFTER UPDATE ON loans BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
   "CREATE TRIGGER IF NOT EXISTS revision_loans_delete AFTER DELETE ON loans BEGIN UPDATE catalogue_revision SET version=version+1 WHERE id=1; END",
   "CREATE TABLE IF NOT EXISTS idempotency (user_id TEXT NOT NULL, key TEXT NOT NULL, operation TEXT NOT NULL, payload_hash TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(user_id,key))",
+  "CREATE TABLE IF NOT EXISTS audit_events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT NOT NULL, operation TEXT NOT NULL, request_hash TEXT NOT NULL, receipt_hash TEXT NOT NULL, idempotency_key TEXT, occurred_at TEXT NOT NULL)",
+  "CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_events(occurred_at DESC)",
   "CREATE VIRTUAL TABLE IF NOT EXISTS books_fts USING fts5(title,author,isbn,subject,content='books',content_rowid='rowid',tokenize='unicode61 remove_diacritics 2')",
   "CREATE TRIGGER IF NOT EXISTS books_fts_ai AFTER INSERT ON books BEGIN INSERT INTO books_fts(rowid,title,author,isbn,subject) VALUES(new.rowid,new.title,new.author,new.isbn,new.subject); END",
   "CREATE TRIGGER IF NOT EXISTS books_fts_ad AFTER DELETE ON books BEGIN INSERT INTO books_fts(books_fts,rowid,title,author,isbn,subject) VALUES('delete',old.rowid,old.title,old.author,old.isbn,old.subject); END",

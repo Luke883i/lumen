@@ -225,3 +225,23 @@ test('production accepts existing non-demo accounts without reseeding',()=>{
   assert.equal(s.get('SELECT count(*) n FROM users').n,1);
   s.close();
 });
+
+test('audit is atomic, append-only in app API, and excludes failed/replayed operations',()=>{
+  const {s,svc,user,book}=fixture(),staff=user('librarian'),student=user('student');
+  const key='audit-hold-request-00001';
+  const first=svc.requestHold(student,book.id,key);
+  svc.requestHold(student,book.id,key);
+  assert.equal(svc.audit(staff).length,1);
+  const event=svc.audit(staff)[0];
+  assert.equal(event.operation,'hold');
+  assert.equal(event.actor_id,student.id);
+  assert.equal(event.idempotency_key,key);
+  assert.match(event.request_hash,/^[a-f0-9]{64}$/);
+  assert.match(event.receipt_hash,/^[a-f0-9]{64}$/);
+  fails(()=>svc.requestHold(student,book.id,'different-key-000001'),'DUPLICATE_HOLD');
+  assert.equal(svc.audit(staff).length,1);
+  fails(()=>svc.audit(student),'FORBIDDEN');
+  svc.cancelHold(student,first.id);
+  assert.equal(svc.audit(staff).length,2);
+  s.close();
+});

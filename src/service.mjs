@@ -43,8 +43,18 @@ export function createService(s) {
     if(!current||!current.active) fail(403,'ACCOUNT_DISABLED','Account disabilitato');
     if(current.role!==user.role||!roles.includes(current.role)) fail(403,'FORBIDDEN','Permesso insufficiente');
   }
+  function recordAudit(user,operation,payload,result,key=null) {
+    const requestHash=createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+    const receiptHash=createHash('sha256').update(JSON.stringify(result)).digest('hex');
+    s.run("INSERT INTO audit_events(actor_id,operation,request_hash,receipt_hash,idempotency_key,occurred_at) VALUES(?,?,?,?,?,?)",
+      user.id,operation,requestHash,receiptHash,key,now());
+  }
   function idempotent(user,key,operation,payload,fn) {
-    if(!key) return s.tx(fn);
+    if(!key) return s.tx(()=>{
+      const result=JSON.parse(JSON.stringify(fn()));
+      recordAudit(user,operation,payload,result);
+      return result;
+    });
     if(typeof key!=='string'||!/^[a-zA-Z0-9_-]{12,100}$/.test(key)) fail(400,'IDEMPOTENCY_KEY_INVALID','Chiave idempotente non valida');
     return s.tx(()=>{
       const digest=createHash('sha256').update(JSON.stringify(payload)).digest('hex');
@@ -55,6 +65,7 @@ export function createService(s) {
       }
       const result=JSON.parse(JSON.stringify(fn()));
       s.run('INSERT INTO idempotency(user_id,key,operation,payload_hash,result_json,created_at) VALUES(?,?,?,?,?,?)',user.id,key,operation,digest,JSON.stringify(result),now());
+      recordAudit(user,operation,payload,result,key);
       return result;
     });
   }
@@ -293,6 +304,11 @@ export function createService(s) {
       requireRole(user,['student','faculty','librarian']);
       s.run('DELETE FROM subscriptions WHERE user_id=? AND endpoint=?',user.id,str(endpoint,2000));
       return {ok:true};
+    },
+    audit(user,limit=100) {
+      requireRole(user,['librarian']);
+      const bounded=Math.max(1,Math.min(200,Number(limit)||100));
+      return s.all('SELECT sequence,actor_id,operation,request_hash,receipt_hash,idempotency_key,occurred_at FROM audit_events ORDER BY sequence DESC LIMIT ?',bounded);
     },
     stats(user) {
       requireRole(user,['librarian']);
