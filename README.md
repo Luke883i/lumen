@@ -2,6 +2,14 @@
 
 LUMEN is a deployable, installable library-services PWA for patrons, faculty and librarians.
 
+## LUMEN experience and installable PWA
+
+The [product lattice](docs/PRODUCT_LATTICE.md) specifies the minimal R8–R13 sequence to move from a polished pilot to an evidence-backed enterprise release. R8 introduces LUMEN design tokens, a public **/installazione** guide for Android Chrome and Windows Chrome/Edge, consent-aware Chrome notifications, a native keyboard-accessible confirmation dialog and honest guest/student/faculty/librarian copy. No UI framework or extra package is required.
+
+Use `npm run dev` in a fresh Codespace and open port 3000; on an HTTPS site, follow **Installa app** in LUMEN or in the browser menu. The resulting PWA opens in a standalone browser window, not as a native APK. Notification delivery requires configured VAPID secrets, explicit user permission, compatible browser/OS support, and remains best-effort; the inbox is always authoritative.
+
+**User acceptance still to run:** real Chrome Android/Windows install, permission and notification click, keyboard/screen-reader checks, and full Render canary with exact SHA. Tests in CI verify source contracts and server PWA assets; they do not replace real-device acceptance.
+
 ## One-command Codespaces boot
 
 1. From this repo choose **Code → Codespaces → Create codespace on main** (after PR #7 is merged). A clean Codespace uses the Node 24 devcontainer and runs `npm ci` automatically. Existing Codespaces created with an older image require **Codespaces: Rebuild Container**.

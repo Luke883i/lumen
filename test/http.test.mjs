@@ -73,3 +73,25 @@ test('staff mutation audit is permission-scoped and omits raw data',async()=>{
   assert.ok(entries.some(x=>x.operation==='hold'));
   assert.ok(entries.every(x=>!('payload' in x)&&!('password' in x)));
 });
+
+test('R8 PWA experience assets and install route are served with correct types',async()=>{
+ const module=await fetch(host+'/experience.js');
+ assert.equal(module.status,200);
+ assert.match(module.headers.get('content-type'),/javascript/);
+ assert.ok((await module.text()).includes('installExperience'));
+ const css=await fetch(host+'/style.css');
+ assert.equal(css.status,200);
+ const stylesheet=await css.text();
+ assert.ok(stylesheet.includes('--lumen-ink'));
+ assert.ok(stylesheet.includes('.lumen-dialog'));
+ const start=await fetch(host+'/installazione');
+ assert.equal(start.status,200);
+ const html=await start.text();
+ assert.ok(html.includes('id="lumen-dialog"'));
+ const worker=await fetch(host+'/sw.js');
+ assert.equal(worker.status,200);
+ const source=await worker.text();
+ assert.ok(source.includes("'/experience.js'"));
+ const manifest=await (await fetch(host+'/manifest.webmanifest')).json();
+ assert.deepEqual(manifest.shortcuts.map(x=>x.url),['/catalogo','/me','/notifiche']);
+});
