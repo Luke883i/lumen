@@ -35,6 +35,12 @@ function promote(s,bookId) {
   return count;
 }
 export function createService(s) {
+  function requireRole(user, roles) {
+    if(!user) fail(401,'AUTH_REQUIRED','Effettua l’accesso');
+    const current=s.get('SELECT active,role FROM users WHERE id=?',user.id);
+    if(!current||!current.active) fail(403,'ACCOUNT_DISABLED','Account disabilitato');
+    if(current.role!==user.role||!roles.includes(current.role)) fail(403,'FORBIDDEN','Permesso insufficiente');
+  }
   const api = {
     current(token) {
       if(!token) return null;
