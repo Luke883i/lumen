@@ -25,10 +25,14 @@ const prod=process.env.NODE_ENV==='production';
 const mime={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.webmanifest':'application/manifest+json','.png':'image/png','.ico':'image/x-icon'};
 const json=(res,status,data,headers={})=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(JSON.stringify(data));};
 const respond=(res,data,status=200)=>json(res,status,data);
-const cookieToken=req=>{const raw=req.headers.cookie||'';const match=raw.match(/(?:^|;\s*)lumen_session=([^;]+)/);return match?decodeURIComponent(match[1]):'';};
+const cookieToken=req=>{const raw=req.headers.cookie||'';const match=raw.match(/(?:^|;\s*)lumen_session=([^;]+)/);try{return match?decodeURIComponent(match[1]):'';}catch{return '';} };
 const cookieAttrs=(maxAge)=>'Path=/; HttpOnly; SameSite=Lax; '+(prod?'Secure; ':'')+'Max-Age='+maxAge;
-const flowCookie=(req)=>{const match=(req.headers.cookie||'').match(/(?:^|;\s*)lumen_oidc_flow=([^;]+)/);return match?decodeURIComponent(match[1]):'';};
-const pathId=(path,prefix,suffix='')=>path.startsWith(prefix)&&path.endsWith(suffix)?decodeURIComponent(path.slice(prefix.length,path.length-suffix.length)):null;
+const flowCookie=(req)=>{const match=(req.headers.cookie||'').match(/(?:^|;\s*)lumen_oidc_flow=([^;]+)/);try{return match?decodeURIComponent(match[1]):'';}catch{return '';} };
+const pathId=(path,prefix,suffix='')=>{
+  if(!path.startsWith(prefix)||!path.endsWith(suffix))return null;
+  try{return decodeURIComponent(path.slice(prefix.length,path.length-suffix.length));}
+  catch{throw new Failure(400,'PATH_INVALID','Identificativo URL non valido');}
+};
 const readJson=async req=>{
   if(!(req.headers['content-type']||'').toLowerCase().startsWith('application/json')) throw new Failure(415,'JSON_REQUIRED','Invia JSON');
   let payload='';
@@ -76,6 +80,7 @@ export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCircul
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
     res.setHeader('X-Frame-Options','DENY');
+    if(prod)res.setHeader('Strict-Transport-Security','max-age=15552000');
     res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
     try {
