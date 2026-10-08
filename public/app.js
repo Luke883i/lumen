@@ -1,6 +1,6 @@
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
-const state={user:null,csrf:null,install:null,koha:false,kohaWrite:false,kohaLoans:false};
+const state={user:null,csrf:null,install:null,koha:false,kohaWrite:false,kohaLoans:false,kohaReturns:false};
 const retryKeys=new Map();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=s=>esc(s);
@@ -132,8 +132,9 @@ async function staff(){
   const [data,users,books,suggestions]=await Promise.all([api('/api/staff/stats'),api('/api/staff/users'),api('/api/books'),api('/api/suggestions')]);
   const options=arr=>arr.map(x=>'<option value="'+esc(x.id)+'">'+t(x.name||x.title)+' ('+t(x.email||x.author)+')</option>').join('');
   const kohaMapping=state.kohaWrite?'<section class="section card"><h2>Collega un account Koha</h2><p class="muted">L’email dell’account deve corrispondere a quella restituita da Koha. Nessun collegamento automatico.</p><form class="form" data-form="koha-bind"><label>Account LUMEN<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label>'+field('Identificativo patron Koha','patronId','ID numerico',true,'number')+'<button type="submit" class="btn">Verifica e collega patron</button></form><p><a data-nav href="/staff/koha-pending">Verifica operazioni Koha in sospeso →</a></p></section>':'';
+  const kohaReturnDesk=state.kohaReturns?'<section class="section card"><h2>Restituzioni Koha</h2><p class="fine">La restituzione si registra nella postazione Koha, non in LUMEN. Qui puoi preparare e verificare il rientro.</p><a class="btn alt small" data-nav href="/staff/koha-returns">Apri verifiche dei rientri →</a></section>':'';
   const kohaLoanDesk=state.kohaLoans?'<section class="section card"><h2>Banco prestiti Koha</h2><p class="muted">Consegna copia soltanto dopo verifica fisica dell’articolo. Nessuna forzatura delle regole di circolazione Koha.</p><form class="form" data-form="koha-checkout"><label>Patron associato a Koha<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label>'+field('ID copia Koha (item_id)','itemId','Identificativo numerico',true,'number')+'<button class="btn" type="submit">Consegna via Koha</button></form><p><a data-nav href="/staff/koha-loans-pending">Riconcilia prestiti e rinnovi incerti →</a></p></section>':'';
-  return sectionTitle('Banco bibliotecario','Una dashboard operativa per circolazione, acquisti e comunicazioni.')+kohaMapping+kohaLoanDesk
+  return sectionTitle('Banco bibliotecario','Una dashboard operativa per circolazione, acquisti e comunicazioni.')+kohaMapping+kohaLoanDesk+kohaReturnDesk
   +'<div class="grid section">'+[['Titoli',data.books],['Copie',data.copies],['Prestiti attivi',data.loans],['Utenti',data.users],['In coda',data.queued],['Acquisti da valutare',data.pending]].map(([k,v])=>'<div class="card"><p class="label">'+t(k)+'</p><p class="metric">'+v+'</p></div>').join('')+'</div>'
   +'<div class="layout section"><div class="card"><h2>Registra prestito</h2><form class="form" data-form="checkout"><label>Utente<select name="userId" required>'+options(users.filter(x=>x.active))+'</select></label><label>Libro<select name="bookId" required>'+options(books)+'</select></label><button class="btn" type="submit">Consegna volume</button></form></div>'
   +'<div class="card"><h2>Copia e catalogo</h2><form class="form" data-form="book">'+field('Titolo','title')+field('Autore','author')+field('ISBN','isbn','ISBN',false)+field('Materia','subject','Materia',false)+field('Scaffale','shelf','Collocazione',false)+field('Numero copie','copies','1',true,'number')+'<button class="btn" type="submit">Registra titolo e copie</button></form></div></div>'
@@ -214,6 +215,22 @@ async function kohaLoanPending(){
     +'<div class="list section">'+(pending.length?pending.map(x=>'<article class="card"><h3>'+t(x.kind==='renew'?'Rinnovo':'Prestito')+' per patron #'+Number(x.patron_id)+'</h3><p class="fine">Item #'+t(x.item_id||'da verificare')+' · Stato '+t(x.state)+' · '+t(x.error_code||'nessun codice')+'</p>'
     +'<form data-form="koha-loan-reconcile" class="form"><input type="hidden" name="attemptId" value="'+esc(x.id)+'">'+field('ID prestito Koha accertato','checkoutId','ID verificato su Koha',true,'number')+'<button type="submit" class="btn small">Verifica ricevuta</button></form></article>').join(''):empty('Nessuna operazione da verificare.'))+'</div>';
 }
+
+async function kohaReturnsDesk(){
+  if(!isStaff())return forbidden();
+  const tickets=await api('/api/staff/koha/returns');
+  return sectionTitle('Verifica restituzioni Koha','LUMEN non registra il rientro al posto di Koha: conferma soltanto una restituzione già contabilizzata dal gestionale.')
+    +'<section class="section card"><h2>Prepara verifica</h2><p>Identifica il prestito Koha e verifica la restituzione fisica della copia. Usa la procedura ufficiale Koha per registrare il rientro.</p>'
+    +'<form data-form="koha-return-prepare" class="form">'+field('ID prestito Koha','checkoutId','Identificativo numerico',true,'number')
+    +'<button class="btn" type="submit">Prepara verifica rientro</button></form></section>'
+    +'<section class="section"><h2>Rientri in attesa di verifica</h2><div class="list">'
+    +(tickets.length?tickets.map(x=>'<article class="card"><h3>Prestito #'+Number(x.checkoutId)+'</h3>'
+    +'<p class="fine">Patron #'+Number(x.patronId)+' · Copia #'+Number(x.itemId)+' · Avviata il '+t(x.createdAt)+'</p>'
+    +'<p>1. Registra fisicamente il check-in in Koha. 2. Premi Verifica per leggere una prova positiva dallo storico ufficiale.</p>'
+    +'<form data-form="koha-return-verify"><input type="hidden" name="ticketId" value="'+esc(x.ticketId)+'">'
+    +'<button class="btn small" type="submit">Verifica restituzione su Koha</button></form></article>').join('')
+    :empty('Nessun rientro aperto.'))+'</div></section>';
+}
 async function view(){
   const path=location.pathname;
   if(path==='/')return home();
@@ -222,6 +239,7 @@ async function view(){
   if(path==='/koha/me'&&state.kohaWrite)return kohaMyHolds();
   if(path==='/koha/loans'&&state.kohaLoans)return kohaMyLoans();
   if(path==='/staff/koha-loans-pending'&&state.kohaLoans)return kohaLoanPending();
+  if(path==='/staff/koha-returns'&&state.kohaReturns)return kohaReturnsDesk();
   if(path==='/staff/koha-pending'&&state.kohaWrite)return kohaPending();
   if(path.startsWith('/koha/')&&state.koha)return kohaDetail();
   if(path.startsWith('/catalogo/'))return bookDetail();
@@ -274,6 +292,16 @@ document.addEventListener('submit',async event=>{
   try{
     if(action==='search'){navigate('/catalogo?q='+encodeURIComponent(data.query||''));return;}
     if(action==='koha-search'){navigate('/koha?q='+encodeURIComponent(data.query||''));return;}
+    if(action==='koha-return-prepare'){
+      const ticket=await api('/api/staff/koha/returns/prepare','POST',data);
+      message('Verifica predisposta per il prestito #'+ticket.checkoutId+'. Registra il rientro nel sistema Koha.');
+      await render();return;
+    }
+    if(action==='koha-return-verify'){
+      const ticket=await api('/api/staff/koha/returns/verify','POST',data);
+      message('Rientro #'+ticket.checkoutId+' verificato con evidenza Koha.');
+      await render();return;
+    }
     if(action==='koha-renew'){
       const receipt=await api('/api/integrations/koha/my/renew','POST',data);
       message('Koha ha confermato il rinnovo #'+receipt.checkoutId);
@@ -332,4 +360,4 @@ async function enablePush(){
 window.addEventListener('popstate',render);
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.install=e;const button=document.querySelector('#install');if(button)button.style.display='';});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
-(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;state.kohaLoans=!!c.koha?.loansEnabled;}catch(e){message(e.message,true);}await render();})();
+(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;state.kohaLoans=!!c.koha?.loansEnabled;state.kohaReturns=!!c.koha?.returnsEnabled;}catch(e){message(e.message,true);}await render();})();
