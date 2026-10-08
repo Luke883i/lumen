@@ -33,7 +33,7 @@ test('misleading root license or altered dependency closure fails',()=>{
   assert.equal(licenseGate(d).status,'FAIL');
   const e=data();e.rootPackage.dependencies['unreviewed-external']='1.0.0';
   assert.equal(licenseGate(e).status,'FAIL');
-  const z=data();z.notices=z.notices.replace('Koha','Unidentified-system');
+  const z=data();z.notices=z.notices.replaceAll('Koha','Unidentified-system');
   assert.equal(licenseGate(z).status,'FAIL');
 });
 test('test packages are isolated from production dependencies',()=>{
