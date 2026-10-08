@@ -61,7 +61,7 @@ test('student login, hold lifecycle and LUMEN dialog cancel/confirm are browser-
   const receiptPromise=page.waitForResponse(r=>r.url().endsWith('/api/holds')&&r.request().method()==='POST');
   await page.locator('form[data-form="hold"] button[type="submit"]').click();
   const response=await receiptPromise;
-  expect(response.status()).toBe(200);
+  expect(response.status()).toBe(201); // POST /api/holds creates a reservation
   const receipt=await response.json();
   expect(['queued','ready']).toContain(receipt.status);
   await expect(page.locator('#toast')).toContainText(receipt.status==='ready'?

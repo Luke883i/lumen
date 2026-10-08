@@ -23,13 +23,14 @@ export default defineConfig({
     actionTimeout:12000
   },
   projects:[
-    {name:'chrome-desktop',use:{...devices['Desktop Chrome']}},
-    {name:'android-emulation',use:{...devices['Pixel 7'],browserName:'chromium'}}
+    {name:'chrome-desktop',use:{...devices['Desktop Chrome'],baseURL:'http://127.0.0.1:3219'}},
+    {name:'android-emulation',use:{...devices['Pixel 7'],browserName:'chromium',baseURL:'http://127.0.0.1:3220'}}
   ],
-  webServer:{
+  // Failure in one platform must not mutate another platform's test database.
+  webServer:[3219,3220].map(port=>({
     command:'npm run dev',
     cwd:root,
-    url:origin+'/api/health',
+    url:'http://127.0.0.1:'+port+'/api/health',
     timeout:90000,
     reuseExistingServer:false,
     env:{
@@ -43,5 +44,5 @@ export default defineConfig({
       OIDC_ONLY:'0'
     },
     stdout:'ignore',stderr:'pipe'
-  }
+  }))
 });
