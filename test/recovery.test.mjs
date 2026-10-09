@@ -114,3 +114,28 @@ test('R10 CLI emits machine-readable FAIL without leaking private filesystem pat
   assert.equal(r.stdout.includes('sensitive-patron-name'),false);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
+
+test('R10 standard npm CLI passes on independently relocated offsite snapshot and manifest',async()=>{
+ const dir=fixture();
+ try{
+  const original=await prepared(dir);
+  const {mkdirSync,renameSync}=await import('node:fs');
+  const remote=join(dir,'offsite-extract');
+  mkdirSync(remote);
+  const backup=join(remote,'imported.sqlite');
+  renameSync(original.backup,backup);
+  renameSync(original.path,backup+'.manifest.json');
+  // The manifest has the original Render-like destination pathname; the
+  // archive must remain verifiable after relocation off the origin disk.
+  const r=spawnSync('npm',['run','verify:recovery','--',backup],{
+    cwd:new URL('../',import.meta.url),encoding:'utf8',timeout:25000
+  });
+  assert.equal(r.status,0,r.stderr+' '+r.stdout);
+  const start=r.stdout.indexOf('{\n');
+  const result=JSON.parse(r.stdout.slice(start));
+  assert.equal(result.gate,'R10_OFFLINE_RECOVERY');
+  assert.equal(result.status,'PASS');
+  assert.equal(result.sha256,original.manifest.sha256);
+  assert.equal(result.caveats.includes('NOT_OFFSITE_EVIDENCE'),true);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
