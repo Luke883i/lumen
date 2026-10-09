@@ -1,4 +1,5 @@
 import {roleNavigation,activeNavigation,taskLinks,staffAreaFromSearch,STAFF_AREAS} from './navigation.js';
+import {nextJourney} from './journey.js';
 import {createInboxWatcher} from './notification-watch.js';
 import {createRenderEpoch,mutationFailure,beginAction,afterAction} from './interaction.js';
 import {creditsLinks,creditsProjection} from './credits.js';
@@ -141,10 +142,18 @@ function navigationContext(){
     koha:state.koha,kohaWrite:state.kohaWrite,kohaLoans:state.kohaLoans};
 }
 function taskHub(title='Azioni utili'){
-  const all=taskLinks(navigationContext());
-  const items=title==='Servizi collegati'?all.filter(item=>item.path.startsWith('/koha')):all;
+  const context=navigationContext(),all=taskLinks(context);
+  const linked=title==='Servizi collegati';
+  const items=linked?all.filter(item=>item.path.startsWith('/koha')):all;
+  // Editorial priority, not a new permission: links still come from the
+  // existing role-aware task inventory and backend RBAC is unchanged.
+  const next=linked?null:nextJourney({...context,online:navigator.onLine!==false});
   return '<section class="section task-hub" aria-label="'+t(title)+'"><div class="section-head"><h2>'+t(title)+'</h2></div>'
-    +'<div class="task-list">'+items.map(item=>'<a class="task-link" data-nav href="'+esc(item.path)+'"><span><strong>'+t(item.label)+'</strong><small>'+t(item.detail)+'</small></span><span aria-hidden="true">→</span></a>').join('')+'</div></section>';
+    +(next?'<p class="task-hint">'+t(next.detail)+'</p>':'')
+    +'<div class="task-list">'+items.map(item=>{
+      const featured=next?.enabled&&item.path===next.href;
+      return '<a class="task-link'+(featured?' task-link--featured':'')+'" data-nav href="'+esc(item.path)+'"><span><strong>'+t(featured?next.label:item.label)+'</strong><small>'+t(item.detail)+'</small></span><span aria-hidden="true">→</span></a>';
+    }).join('')+'</div></section>';
 }
 function header(){
   const {primary,secondary}=roleNavigation(navigationContext());
