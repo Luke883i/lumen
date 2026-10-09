@@ -123,3 +123,8 @@ A blue-centered presentation palette and deliberately restrained gradients have 
 ## Institutional information hub and role screenshot audit (PR #20)
 
 Routes `/informazioni` / `/condizioni` / `/opensource` separate institution-owned library policy, explanatory UX and software/OSS notices, with public HTTPS-only institution link configuration and explicit missing-state output. Owner/legal sign-off remains a release requirement. Playwright captures actual demo-only role screenshots (desktop/Android-emulated) and SHA-bound semantic/layout audit JSON, archived in Actions. No local DNS-resolvable repo clone was available in the assistant's runtime; actual browser execution is on the repo's GitHub runner and labelled as such. External Render/Koha/IdP/WCAG-AT/2k gates remain open.
+
+
+## R10 — Recoverability verification (PR #22)
+
+An independent read-only verifier copies a SQLite snapshot to an isolated temporary location and enforces bounded manifest v1 parsing, byte size/SHA-256, PRAGMA integrity_check, foreign_key_check, required LUMEN tables and circulation indexes. A backup writer cannot overwrite an existing snapshot/manifest. The CLI returns machine-readable PASS/FAIL, without private catalogue/patron payloads. Negative tests cover orphan rows, wrong schema, bytes, manifest, symlink, and source-after-snapshot mutation. This is a **local CI proof**, not evidence of a real Render deployment or offsite storage/restore, and an unkeyed SHA manifest is not a signature. See [R10_RECOVERY.md](R10_RECOVERY.md).
