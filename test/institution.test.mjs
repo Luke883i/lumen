@@ -55,7 +55,9 @@ test('public routes/footers and service worker expose informational surfaces',()
  assert.ok(app.includes('creditsProjection({kohaConfigured:state.koha'));
  assert.ok(app.includes('Non configurato in LUMEN'));
  assert.ok(app.includes('Licenza LUMEN (MIT)'));
- assert.ok(app.includes('Informazioni e condizioni'));
+ assert.ok(app.includes('Informazioni</a>'));
+ assert.ok(app.includes('Condizioni d’uso</a>'));
+ assert.ok(app.includes('Open source</a>'));
  const sw=load('public/sw.js');
  assert.ok(sw.includes("'/legal.js'"));
  assert.ok(load('public/style.css').includes('.legal-grid'));
