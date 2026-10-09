@@ -80,10 +80,10 @@ test('SHA-bound, role-specific real screenshots + semantic audit at desktop and 
   {id:'05-student-my-area',route:'/me',role:'student',meaning:'Know current loans and holds, find next action',authority:'LUMEN local receipt'},
   {id:'06-student-notifications',route:'/notifiche',role:'student',meaning:'Read authoritative inbox',authority:'LUMEN inbox'}
  ])records.push(await capture(page,info,plan));
- await page.goto('/');await page.locator('[data-click="logout"]').first().click();
+ await page.goto('/impostazioni');await page.locator('[data-click="logout"]').first().click();
  await signIn(page,'faculty');
  records.push(await capture(page,info,{id:'07-faculty-proposals',route:'/acquisti',role:'faculty',meaning:'Submit and track acquisitions',authority:'LUMEN proposal state'}));
- await page.goto('/');await page.locator('[data-click="logout"]').first().click();
+ await page.goto('/impostazioni');await page.locator('[data-click="logout"]').first().click();
  await signIn(page,'librarian');
  for(const plan of [
   {id:'08-librarian-overview',route:'/staff?area=panoramica',role:'librarian',meaning:'Orient priorities at the desk',authority:'LUMEN staff stats'},
