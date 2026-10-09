@@ -1,3 +1,10 @@
+[![ROA Research Programme](https://img.shields.io/badge/ROA-Research_Programme-1f6feb)](https://github.com/Luke883i/academics)
+[![Programme Role](https://img.shields.io/badge/role-LIBRARY_SERVICES_VERTICAL-6f42c1)](https://github.com/Luke883i/academics#repository-map)
+
+<!-- roa-programme-header:v1 hub=Luke883i/academics framework=Luke883i/ROA role=LIBRARY_SERVICES_VERTICAL -->
+
+> **ROA Research Programme.** This repository is a component of the **ROA Research Programme — Computational Epistemics, Semantic Architectures & Governable AI Systems**, coordinated in [`Luke883i/academics`](https://github.com/Luke883i/academics) and theoretically anchored by [`Luke883i/ROA`](https://github.com/Luke883i/ROA). **Programme membership is a coordination/topology statement:** repository-local contracts and evidence remain authoritative for LUMEN, and membership alone does not imply formal derivation from ROA, conformance to ROA, empirical validation of ROA theory, or production readiness.
+
 # LUMEN
 
 **Open-source webapp bibliotecaria** per studenti, docenti e bibliotecari.
