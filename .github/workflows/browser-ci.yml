@@ -49,6 +49,14 @@ jobs:
         run: |
           { echo '### Browser acceptance failure at ${{ github.sha }}'; echo '~~~text'; tail -n 140 /tmp/lumen-browser-acceptance.log 2>/dev/null || true; echo '~~~'; } > /tmp/lumen-browser-errors.md
           gh pr comment "$PR_NUMBER" --body-file /tmp/lumen-browser-errors.md
+      - name: Post role-specific semantic screenshot audit to PR
+        if: success() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          node scripts/report-role-audit.mjs > /tmp/lumen-role-audit.md
+          gh pr comment "$PR_NUMBER" --body-file /tmp/lumen-role-audit.md
       - name: Archive SHA-bound UX-S4 measurements
         if: always()
         uses: actions/upload-artifact@v4
