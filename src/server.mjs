@@ -10,6 +10,7 @@ import { createKohaLoans } from './koha-loans.mjs';
 import { createKohaReturns } from './koha-returns.mjs';
 import { createOidc } from './oidc.mjs';
 import {trustedOrigin,registerLoginAttempt} from './security.mjs';
+import {institutionSettings} from './institution.mjs';
 
 const s=openStore(process.env.LUMEN_DB_PATH || './data/lumen.sqlite');
 bootstrap(s);
@@ -135,7 +136,7 @@ export function buildHandler({ api=service, database=s, kohaApi=koha, kohaCircul
         return json(res,200,{user:result.user,csrf:result.csrf},{'Set-Cookie':'lumen_session='+encodeURIComponent(result.token)+'; '+cookieAttrs(43200)});
       }
       if(method==='POST'&&path==='/api/logout'){api.logout(token);return json(res,200,{ok:true},{'Set-Cookie':'lumen_session=; '+cookieAttrs(0)});}
-      if(method==='GET'&&path==='/api/config') return respond(res,{identity:{oidcEnabled:oidcApi.enabled,oidcOnly:oidcApi.only},koha:{configured:kohaApi.configured,mode:kohaLoansApi.enabled?'circulation_pilot':kohaCirculationApi.enabled?'patron_holds_pilot':'read_only',holdsEnabled:kohaCirculationApi.enabled,loansEnabled:kohaLoansApi.enabled,returnsEnabled:kohaReturnsApi.enabled}});
+      if(method==='GET'&&path==='/api/config') return respond(res,{institution:institutionSettings(process.env),identity:{oidcEnabled:oidcApi.enabled,oidcOnly:oidcApi.only},koha:{configured:kohaApi.configured,mode:kohaLoansApi.enabled?'circulation_pilot':kohaCirculationApi.enabled?'patron_holds_pilot':'read_only',holdsEnabled:kohaCirculationApi.enabled,loansEnabled:kohaLoansApi.enabled,returnsEnabled:kohaReturnsApi.enabled}});
       if(method==='POST'&&path==='/api/staff/oidc/bind'){
         const body=await readJson(req);
         return respond(res,oidcApi.bind(user,body.userId,body.subject));
