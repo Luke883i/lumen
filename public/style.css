@@ -193,3 +193,16 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .legal-compact{max-width:830px}.legal-compact h2{font-size:1.07rem;margin:12px 0 7px}.legal-compact h2:first-child{margin-top:0}.legal-compact p{font-size:.9rem;margin-bottom:11px}
 .legal-actions{display:flex;gap:12px 20px;flex-wrap:wrap;margin-top:12px}
 @media(max-width:600px){.legal-grid{grid-template-columns:1fr}.legal-intro>.card{padding:13px}}
+
+/* Screenshot-led density: editorial/proposal forms are structurally compact,
+   never clipped or fixed-height. Keep ≥44px input/button targets. */
+.form[data-form="suggest"],.form[data-form="broadcast"]{gap:10px}
+.form[data-form="suggest"] label,.form[data-form="broadcast"] label{gap:5px}
+.form[data-form="suggest"] textarea,.form[data-form="broadcast"] textarea{min-height:76px}
+.form[data-form="suggest"] input,.form[data-form="broadcast"] input,
+.form[data-form="broadcast"] select{min-height:44px;padding-block:8px}
+@media(min-width:780px){
+  .form[data-form="suggest"],.form[data-form="broadcast"]{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px}
+  .form[data-form="broadcast"] label:nth-of-type(3){grid-column:1/-1}
+  .form[data-form="suggest"] button,.form[data-form="broadcast"] button{grid-column:1/-1}
+}

@@ -53,6 +53,16 @@ async function capture(page,info,{id,route,role,meaning,authority}){
  if(data.actions.some(x=>x.targetHeight<24))issues.push('SMALL_ACTION_TARGET');
  if(data.layout.hero?.height>240&&data.viewport.width>=850)issues.push('OVERSIZED_HERO');
  if(data.layout.hero?.height>180&&data.viewport.width<600)issues.push('OVERSIZED_MOBILE_HERO');
+ // Internal visual budgets: these are NOT WCAG limits. They prevent a form
+ // swallowing an entire first viewport while preserving 44px controls.
+ const formBudgets={
+  '07-faculty-proposals':{desktop:450,mobile:505},
+  '11-librarian-communications':{desktop:450,mobile:505},
+  '03-guest-terms':{desktop:360,mobile:505}
+ };
+ const budget=formBudgets[id];
+ if(budget&&data.layout.largestCardHeight>(data.viewport.width>=850?budget.desktop:budget.mobile))
+   issues.push('OVERSIZED_FORM_OR_INFO_CARD');
  const record={commit:version,project:info.project.name,id,route,role,meaning,authority,
   ...data,issues,epistemic:{screenshots:'actual_headless_chromium',external:authority==='Koha'?'not_qualified':'local_test_fixture'}};
  const imagePath=info.outputPath(id+'.png');

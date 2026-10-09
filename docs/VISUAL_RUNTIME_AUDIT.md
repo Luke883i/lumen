@@ -49,3 +49,7 @@ npm --prefix browser ci
 npm --prefix browser exec -- playwright install chromium
 npm --prefix browser exec -- playwright test --config playwright.config.mjs tests/role-audit.spec.mjs
 ```
+
+## Screenshot-led composition mutation
+
+The first 24-shot report detected long single-column task forms (approximately 500px for faculty acquisition proposal and librarian communication). Without removing fields or authority checks, these specific forms now use two columns above 780 CSS px, smaller gaps, and textareas with a natural minimum of 76 CSS px. Mobile keeps a logical single-column reading order. Controls remain at least 44px in height; no clipping or fixed-height panels are introduced. New screenshot-specific internal budgets: faculty proposals and staff communications ≤450 CSS px desktop / ≤505 mobile; informative terms card ≤360 desktop / ≤505 mobile. These are LUMEN density goals, **not WCAG normative thresholds**. 200% zoom/reflow and screen-reader manual review remain separate.
