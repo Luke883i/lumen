@@ -53,7 +53,8 @@ export function localStatus(domain,status){
   hold:{queued:'In coda',ready:'Pronto al ritiro',fulfilled:'Consegnata',cancelled:'Annullata'},
   suggestion:{pending:'In valutazione',approved:'Approvata',rejected:'Non accolta',ordered:'Ordinata'}
  };
- const label=maps[domain]?.[status];
+ const table=typeof domain==='string'&&Object.hasOwn(maps,domain)?maps[domain]:null;
+ const label=table&&typeof status==='string'&&Object.hasOwn(table,status)?table[status]:null;
  return Object.freeze(label?{label,epistemic:'supported'}:{label:'Stato da verificare',epistemic:'unknown'});
 }
 /** Successful local mutation transport is not automatically proof of downstream delivery. */

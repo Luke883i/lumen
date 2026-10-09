@@ -14,7 +14,7 @@ export function verifiedEmpty(kind,{confirmed=false,query=false}={}){
       message:'Impossibile verificare i dati in questo momento.',
       action:null,provenance:'presentation_only'});
   const data=messages[kind];
-  const action=kind==='catalog'&&!query?null:data.href?Object.freeze({href:data.href,label:data.label}):null;
+  const action=kind==='catalog'&&query!==true?null:data.href?Object.freeze({href:data.href,label:data.label}):null;
   return Object.freeze({status:'empty',epistemicStatus:'supported',message:data.message,
     action,provenance:kind==='inbox'?'lumen.inbox':'lumen.standalone'});
 }
