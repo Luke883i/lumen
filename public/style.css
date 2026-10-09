@@ -177,3 +177,32 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .credits-grid h2,.license-summary h2{font-size:1.12rem;margin:0 0 8px}
 .credits-grid p,.license-summary p{font-size:.91rem;margin:0 0 12px}
 @media(max-width:600px){.credits-band{align-items:flex-start;gap:8px}.credits-grid{grid-template-columns:1fr}}
+
+/* Informational surfaces: document links, never giant decorative tiles. */
+.legal-intro>.card{padding:16px 18px}
+.legal-intro .eyebrow{color:var(--lumen-blue);letter-spacing:.09em}
+.legal-intro h2{font-size:clamp(1.2rem,2vw,1.5rem);margin:0 0 8px}
+.legal-intro p{margin-bottom:12px}
+.legal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.legal-card{padding:14px 16px;min-width:0}
+.legal-card h3{font-size:1rem;margin:0 0 5px}
+.legal-card p{font-size:.88rem;margin-bottom:9px;color:var(--lumen-muted)}
+.policy-note{background:var(--lumen-warn-soft);border-inline-start:3px solid var(--lumen-warn-ink);padding:10px 12px;border-radius:8px;font-size:.88rem}
+.policy-link,.legal-actions a{color:var(--lumen-blue);text-underline-offset:3px;text-decoration:underline;font-weight:650;font-size:.88rem}
+.policy-missing{font-size:.83rem;color:var(--lumen-warn-ink);font-weight:650}
+.legal-compact{max-width:830px}.legal-compact h2{font-size:1.07rem;margin:12px 0 7px}.legal-compact h2:first-child{margin-top:0}.legal-compact p{font-size:.9rem;margin-bottom:11px}
+.legal-actions{display:flex;gap:12px 20px;flex-wrap:wrap;margin-top:12px}
+@media(max-width:600px){.legal-grid{grid-template-columns:1fr}.legal-intro>.card{padding:13px}}
+
+/* Screenshot-led density: editorial/proposal forms are structurally compact,
+   never clipped or fixed-height. Keep ≥44px input/button targets. */
+.form[data-form="suggest"],.form[data-form="broadcast"]{gap:10px}
+.form[data-form="suggest"] label,.form[data-form="broadcast"] label{gap:5px}
+.form[data-form="suggest"] textarea,.form[data-form="broadcast"] textarea{min-height:76px}
+.form[data-form="suggest"] input,.form[data-form="broadcast"] input,
+.form[data-form="broadcast"] select{min-height:44px;padding-block:8px}
+@media(min-width:780px){
+  .form[data-form="suggest"],.form[data-form="broadcast"]{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px}
+  .form[data-form="broadcast"] label:nth-of-type(3){grid-column:1/-1}
+  .form[data-form="suggest"] button,.form[data-form="broadcast"] button{grid-column:1/-1}
+}

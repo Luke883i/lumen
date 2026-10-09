@@ -2,13 +2,14 @@ import {roleNavigation,activeNavigation,taskLinks,staffAreaFromSearch,STAFF_AREA
 import {createInboxWatcher} from './notification-watch.js';
 import {createRenderEpoch,mutationFailure,beginAction,afterAction} from './interaction.js';
 import {creditsLinks,creditsProjection} from './credits.js';
+import {institutionProjection,softwareUsage} from './legal.js';
 import {libraryCopy,installExperience,pushExperience,actionConfirmation,localHoldResult,localStatus,localActionFeedback,localClickFeedback} from './experience.js';
 import {projectLocalBook,projectKohaBook,projectLocalHold,projectLocalLoan,projectAcquisition,projectNotification,projectPatron,projectKohaOperation} from './projections.js';
 const root=document.querySelector('#root');
 const toast=document.querySelector('#toast');
 const inboxWatcher=createInboxWatcher();
 const dialog=document.querySelector('#lumen-dialog');
-const state={user:null,csrf:null,install:null,koha:false,kohaWrite:false,kohaLoans:false,kohaReturns:false,oidcEnabled:false,oidcOnly:false};
+const state={user:null,csrf:null,install:null,koha:false,kohaWrite:false,kohaLoans:false,kohaReturns:false,oidcEnabled:false,oidcOnly:false,institution:null};
 const retryKeys=new Map();
 const renderEpoch=createRenderEpoch();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -160,7 +161,7 @@ function header(){
     +'<nav class="nav" aria-label="Navigazione principale">'+primaryDesktop+more+account+'</nav></header>'
     +'<nav class="bottom-nav" aria-label="Navigazione mobile">'+bottom+'</nav>';
 }
-function footer(){return '<footer class="shell footer"><div class="row"><span><strong>LUMEN</strong> · Il tuo spazio per la conoscenza</span><span>Servizi bibliotecari · <a data-nav href="/opensource">Open source e licenze</a> · <a data-nav href="/installazione">Installa app</a> · <a data-nav href="/impostazioni">Impostazioni</a></span></div></footer>';}
+function footer(){return '<footer class="shell footer"><div class="row"><span><strong>LUMEN</strong> · Il tuo spazio per la conoscenza</span><span>Servizi bibliotecari · <a data-nav href="/informazioni">Informazioni</a> · <a data-nav href="/condizioni">Condizioni d’uso</a> · <a data-nav href="/opensource">Open source</a> · <a data-nav href="/installazione">Installa app</a> · <a data-nav href="/impostazioni">Impostazioni</a></span></div></footer>';}
 function externalCredit(href,label){
  return '<a href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">'+t(label)+'</a>';
 }
@@ -168,15 +169,46 @@ function creditsBand(){
  const c=creditsProjection({kohaConfigured:state.koha,oidcEnabled:state.oidcEnabled});
  return '<section class="section credits-band" aria-label="Tecnologie e licenze"><p><strong>Powered by '+t(c.platform)+'</strong>'
   +' <span aria-hidden="true">·</span> '+t(c.koha)+'</p>'
-  +'<div class="credits-actions"><a data-nav href="/opensource">Licenze e riconoscimenti</a>'
+  +'<div class="credits-actions"><a data-nav href="/informazioni">Informazioni sul servizio</a><a data-nav href="/opensource">Licenze e riconoscimenti</a>'
   +externalCredit(creditsLinks.source,'Codice sorgente LUMEN')+'</div></section>';
+}
+function policyReference(entry){
+  return entry.url
+    ?'<a class="policy-link" target="_blank" rel="noopener noreferrer" href="'+esc(entry.url)+'">Consulta il documento della biblioteca ↗</a>'
+    :'<span class="policy-missing">Non configurato in LUMEN</span>';
+}
+function informationPage(){
+  const institution=institutionProjection(state.institution);
+  return sectionTitle('Informazioni sul servizio','Chi gestisce la biblioteca, come usare LUMEN e dove trovare le regole.')
+    +'<section class="section legal-intro"><div class="card"><p class="eyebrow">Servizio bibliotecario</p><h2>'+t(institution.name||'Biblioteca utilizzatrice non indicata')+'</h2>'
+    +'<p>'+t(softwareUsage.summary)+'</p>'
+    +(institution.status==='incomplete'?'<p class="policy-note" role="status">Questa istanza non espone ancora tutte le informazioni istituzionali. Prima di un uso pubblico la biblioteca deve pubblicare i riferimenti applicabili.</p>':'')
+    +'<a class="btn alt small" data-nav href="/condizioni">Come funzionano richieste e prestiti →</a></div></section>'
+    +'<section class="section"><h2>Documenti e contatti della biblioteca</h2><div class="legal-grid">'
+    +institution.fields.map(entry=>'<article class="card legal-card"><h3>'+t(entry.title)+'</h3><p>'+t(entry.detail)+'</p>'+policyReference(entry)+'</article>').join('')
+    +'</div></section><section class="section legal-links"><h2>Il software</h2><p>'+t(softwareUsage.license)+'</p>'
+    +'<a class="btn ghost small" data-nav href="/opensource">Licenze e componenti open source →</a></section>';
+}
+function termsPage(){
+  const p=institutionProjection(state.institution);
+  return sectionTitle('Come utilizzare LUMEN','Funzioni del software e condizioni della biblioteca sono documenti diversi.')
+    +'<section class="section card legal-compact"><h2>Catalogo e prenotazioni</h2><p>'+t(softwareUsage.holds)+'</p>'
+    +'<h2>Proposte di acquisto</h2><p>'+t(softwareUsage.purchases)+'</p>'
+    +'<h2>Comunicazioni e notifiche</h2><p>'+t(softwareUsage.push)+'</p>'
+    +'<p class="policy-note">Questa pagina spiega le funzioni di LUMEN; non definisce durate, sanzioni, requisiti di accesso o obblighi della biblioteca.</p></section>'
+    +'<section class="section card legal-compact"><h2>Condizioni applicabili</h2>'
+    +(p.fields.find(x=>x.id==='terms')?.url?policyReference(p.fields.find(x=>x.id==='terms'))
+      :'<p class="policy-note">Le condizioni istituzionali non sono configurate in LUMEN. Rivolgiti alla biblioteca per le regole vigenti.</p>')
+    +'<div class="legal-actions"><a data-nav href="/informazioni">Informazioni e contatti →</a>'
+    +'<a data-nav href="/opensource">Software e licenze →</a></div></section>';
 }
 function openSourcePage(){
  const c=creditsProjection({kohaConfigured:state.koha,oidcEnabled:state.oidcEnabled});
  return sectionTitle('Open source e riconoscimenti','Tecnologie effettive, integrazioni facoltative e licenze distinte.')
   +'<section class="section card license-summary"><h2>Licenza LUMEN</h2><p>'+t(c.license)+'</p>'
   +'<div class="credits-actions">'+externalCredit(creditsLinks.license,'Licenza LUMEN (MIT)')
-  +externalCredit(creditsLinks.usage,'Condizioni di utilizzo e responsabilità')
+  +'<a data-nav href="/condizioni">Condizioni del servizio bibliotecario</a>'
+  +externalCredit(creditsLinks.usage,'Responsabilità di utilizzo del software')
   +externalCredit(creditsLinks.thirdParties,'Avvisi e licenze di terzi')+'</div></section>'
   +'<section class="section credits-grid">'
   +'<article class="card"><h2>Powered by</h2><p>Il runtime usa '+t(c.platform)+'. Il catalogo e i prestiti locali sono gestiti da LUMEN.</p>'
@@ -405,6 +437,8 @@ async function view(){
   const path=location.pathname;
   if(path==='/')return home();
   if(path==='/opensource')return openSourcePage();
+  if(path==='/informazioni')return informationPage();
+  if(path==='/condizioni')return termsPage();
   if(path==='/installazione')return installPage();
   if(path==='/catalogo')return catalog();
   if(path==='/koha'&&state.koha)return kohaCatalog();
@@ -603,4 +637,4 @@ window.addEventListener('popstate',()=>{void render().then(ok=>{if(ok)document.q
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();state.install=e;if(location.pathname==='/installazione')render();});
 window.addEventListener('appinstalled',()=>{state.install=null;if(location.pathname==='/installazione')render();message('LUMEN installata sul dispositivo');});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
-(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;state.kohaLoans=!!c.koha?.loansEnabled;state.kohaReturns=!!c.koha?.returnsEnabled;state.oidcEnabled=!!c.identity?.oidcEnabled;state.oidcOnly=!!c.identity?.oidcOnly;}catch(e){message(e.message,true);}await render();void refreshInbox();})();
+(async()=>{try{const [m,c]=await Promise.all([api('/api/me'),api('/api/config')]);state.user=m.user;state.csrf=m.csrf;state.koha=!!c.koha?.configured;state.kohaWrite=!!c.koha?.holdsEnabled;state.kohaLoans=!!c.koha?.loansEnabled;state.kohaReturns=!!c.koha?.returnsEnabled;state.oidcEnabled=!!c.identity?.oidcEnabled;state.oidcOnly=!!c.identity?.oidcOnly;state.institution=c.institution||null;}catch(e){message(e.message,true);}await render();void refreshInbox();})();

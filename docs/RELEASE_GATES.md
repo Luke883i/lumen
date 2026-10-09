@@ -119,3 +119,7 @@ A new presentation-only interaction module serializes live screen rendering with
 ## UX-S6A — Blue visual identity
 
 A blue-centered presentation palette and deliberately restrained gradients have been materialized in CSS and the PWA brand/installed icons. Source-level contrast, density budget and real Chromium computed-style+image-decode tests are required at exact commit SHA. No claim of certified WCAG conformance, OS installation, live Render deploy or enterprise capacity follows from this green test suite. Detailed DoD: [UX_BLUE_IDENTITY.md](UX_BLUE_IDENTITY.md).
+
+## Institutional information hub and role screenshot audit (PR #20)
+
+Routes `/informazioni` / `/condizioni` / `/opensource` separate institution-owned library policy, explanatory UX and software/OSS notices, with public HTTPS-only institution link configuration and explicit missing-state output. Owner/legal sign-off remains a release requirement. Playwright captures actual demo-only role screenshots (desktop/Android-emulated) and SHA-bound semantic/layout audit JSON, archived in Actions. No local DNS-resolvable repo clone was available in the assistant's runtime; actual browser execution is on the repo's GitHub runner and labelled as such. External Render/Koha/IdP/WCAG-AT/2k gates remain open.

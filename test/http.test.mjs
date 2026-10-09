@@ -95,3 +95,21 @@ test('R8 PWA experience assets and install route are served with correct types',
  const manifest=await (await fetch(host+'/manifest.webmanifest')).json();
  assert.deepEqual(manifest.shortcuts.map(x=>x.url),['/catalogo','/me','/notifiche']);
 });
+
+test('institutional information and legal routes are anonymous SPA pages',async()=>{
+ for(const route of ['/informazioni','/condizioni','/opensource']){
+  const r=await fetch(host+route);
+  assert.equal(r.status,200,route);
+  const html=await r.text();
+  assert.ok(html.includes('LUMEN'),route);
+  assert.ok(html.includes('id="main"'),route);
+ }
+ const r=await fetch(host+'/api/config');
+ const payload=await r.json();
+ assert.ok(payload.institution,'public institution metadata');
+ assert.equal(payload.institution.completeness,'incomplete');
+ assert.equal(payload.institution.policies.privacy,null);
+ assert.equal(payload.institution.policies.terms,null);
+ for(const field of ['VAPID_PRIVATE_KEY','OIDC_CLIENT_SECRET','ADMIN_PASSWORD'])
+  assert.equal(JSON.stringify(payload).includes(field),false);
+});
