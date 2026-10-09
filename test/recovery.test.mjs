@@ -76,9 +76,14 @@ test('R10 rejects foreign key damage even if PRAGMA integrity_check reports ok',
  const dir=fixture();
  try{
   const source=join(dir,'foreign.sqlite'),dest=join(dir,'foreign-snapshot.sqlite');
-  const db=openStore(source);
+  // Exercise the actual stored schema, then use a raw test-only SQLite
+  // connection to introduce FK damage that LUMEN itself normally prohibits.
+  const initialized=openStore(source);
+  initialized.close();
+  const db=new DatabaseSync(source);
   db.exec('PRAGMA foreign_keys=OFF');
-  db.run('INSERT INTO copies(id,book_id,barcode) VALUES(?,?,?)','orphan-copy','missing-book','r10-broken');
+  db.prepare('INSERT INTO copies(id,book_id,barcode) VALUES(?,?,?)')
+    .run('orphan-copy','missing-book','r10-broken');
   db.close();
   await createBackup({source,destination:dest});
   await reject(verifyRecovery({backupPath:dest}),'SQLITE_FOREIGN_KEY_FAILED');
