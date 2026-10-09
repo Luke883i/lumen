@@ -1,5 +1,5 @@
 import {DatabaseSync,backup} from 'node:sqlite';
-import {existsSync,mkdirSync,linkSync,rmSync,readFileSync,statSync,writeFileSync} from 'node:fs';
+import {existsSync,mkdirSync,linkSync,rmSync,readFileSync,statSync,writeFileSync,chmodSync} from 'node:fs';
 import {dirname,resolve} from 'node:path';
 import {createHash,randomBytes} from 'node:crypto';
 export async function createBackup({source,destination}){
@@ -22,6 +22,8 @@ export async function createBackup({source,destination}){
     if(row.integrity_check!=='ok')throw new Error('Backup integrity check failed');
     const bytes=statSync(tmp).size;
     const sha256=createHash('sha256').update(readFileSync(tmp)).digest('hex');
+    // A backup can contain patron and identity data: private filesystem mode.
+    chmodSync(tmp,0o600);
     // Exclusive hard link in the destination directory: unlike rename,
     // it cannot silently overwrite an earlier snapshot under race.
     linkSync(tmp,target);published=true;rmSync(tmp,{force:true});

@@ -31,6 +31,11 @@ test('backup publication never silently overwrites an earlier snapshot or manife
    const s=openStore(source);
    s.run("INSERT INTO metadata(key,value) VALUES(?,?)",'r10-exclusive','first');
    const first=await createBackup({source,destination});
+   if(process.platform!=='win32'){
+     const {statSync}=await import('node:fs');
+     assert.equal(statSync(destination).mode&0o777,0o600);
+     assert.equal(statSync(destination+'.manifest.json').mode&0o777,0o600);
+   }
    s.run("UPDATE metadata SET value=? WHERE key=?",'second','r10-exclusive');
    await assert.rejects(createBackup({source,destination}),/already exists/);
    const restored=new DatabaseSync(destination,{readOnly:true});
