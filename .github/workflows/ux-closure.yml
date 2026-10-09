@@ -1,0 +1,50 @@
+name: UX Semantic Million Gate
+on:
+  push:
+    branches: [main, feat/lumen-ux-closure-six-slices]
+    paths:
+      - 'public/**'
+      - 'scripts/ux-million.mjs'
+      - 'test/**'
+      - 'package.json'
+      - '.github/workflows/ux-closure.yml'
+  pull_request:
+    paths:
+      - 'public/**'
+      - 'scripts/ux-million.mjs'
+      - 'test/**'
+      - 'package.json'
+      - '.github/workflows/ux-closure.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  semantic-million:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - name: Evaluate 1,000,000 distinct input vectors and 6 synthetic mutants
+        env:
+          GIT_SHA: ${{ github.sha }}
+          UX_MUTATION_REPORT: ${{ runner.temp }}/ux-million.json
+        run: |
+          set -o pipefail
+          npm run ux:mutations | tee "${{ runner.temp }}/ux-million.log"
+      - name: Attach SHA-bound audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumen-ux-million-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/ux-million.json
+            ${{ runner.temp }}/ux-million.log
+          retention-days: 14
+          if-no-files-found: warn

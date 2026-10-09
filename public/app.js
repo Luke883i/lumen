@@ -1,4 +1,6 @@
 import {roleNavigation,activeNavigation,taskLinks,staffAreaFromSearch,STAFF_AREAS} from './navigation.js';
+import {nextJourney} from './journey.js';
+import {verifiedEmpty} from './empty-state.js';
 import {createInboxWatcher} from './notification-watch.js';
 import {createRenderEpoch,mutationFailure,beginAction,afterAction} from './interaction.js';
 import {creditsLinks,creditsProjection} from './credits.js';
@@ -33,6 +35,12 @@ const ic=name=>{
 const badge=(label,kind='')=>'<span class="badge '+kind+'">'+t(label)+'</span>';
 const moneyless=items=>!items?.length;
 const empty=msg=>'<div class="empty">'+t(msg)+'</div>';
+const emptyVerified=(kind,query=false)=>{
+  const x=verifiedEmpty(kind,{confirmed:true,query});
+  return '<div class="empty empty-action" role="status"><p>'+t(x.message)+'</p>'
+    +(x.action?'<a class="btn alt small" data-nav href="'+esc(x.action.href)+'">'+t(x.action.label)+'</a>':'')
+    +'</div>';
+};
 const humanDate=d=>d?new Intl.DateTimeFormat('it-IT',{day:'numeric',month:'short',year:'numeric'}).format(new Date(d)):'—';
 const btn=(label,action,id='',extra='')=>'<button type="button" class="btn small '+extra+'" data-click="'+esc(action)+'" data-id="'+esc(id)+'">'+label+'</button>';
 const routeLink=(route,label,active)=>{
@@ -141,10 +149,18 @@ function navigationContext(){
     koha:state.koha,kohaWrite:state.kohaWrite,kohaLoans:state.kohaLoans};
 }
 function taskHub(title='Azioni utili'){
-  const all=taskLinks(navigationContext());
-  const items=title==='Servizi collegati'?all.filter(item=>item.path.startsWith('/koha')):all;
+  const context=navigationContext(),all=taskLinks(context);
+  const linked=title==='Servizi collegati';
+  const items=linked?all.filter(item=>item.path.startsWith('/koha')):all;
+  // Editorial priority, not a new permission: links still come from the
+  // existing role-aware task inventory and backend RBAC is unchanged.
+  const next=linked?null:nextJourney({...context,online:navigator.onLine!==false});
   return '<section class="section task-hub" aria-label="'+t(title)+'"><div class="section-head"><h2>'+t(title)+'</h2></div>'
-    +'<div class="task-list">'+items.map(item=>'<a class="task-link" data-nav href="'+esc(item.path)+'"><span><strong>'+t(item.label)+'</strong><small>'+t(item.detail)+'</small></span><span aria-hidden="true">→</span></a>').join('')+'</div></section>';
+    +(next?'<p class="task-hint">'+t(next.detail)+'</p>':'')
+    +'<div class="task-list">'+items.map(item=>{
+      const featured=next?.enabled&&item.path===next.href;
+      return '<a class="task-link'+(featured?' task-link--featured':'')+'" data-nav href="'+esc(item.path)+'"><span><strong>'+t(featured?next.label:item.label)+'</strong><small>'+t(item.detail)+'</small></span><span aria-hidden="true">→</span></a>';
+    }).join('')+'</div></section>';
 }
 function header(){
   const {primary,secondary}=roleNavigation(navigationContext());
@@ -233,7 +249,7 @@ async function home(){
   const books=await api('/api/books');
   return '<section class="hero" aria-label="Cerca nella biblioteca"><p class="eyebrow">La tua biblioteca, ovunque</p><h1>Ogni libro apre una possibilità.</h1>'+formSearch()+'<p class="hero-install"><a data-nav href="/installazione">Installa LUMEN sul dispositivo →</a></p></section>'
   +taskHub('Cosa puoi fare')
-  +'<section class="section"><div class="section-head"><h2>Dal catalogo</h2><a class="btn alt small" data-nav href="/catalogo">Vedi tutti →</a></div><div class="grid">'+(books.length?books.slice(0,3).map(bookCard).join(''):empty('Il catalogo sarà disponibile a breve.'))+'</div></section>'
+  +'<section class="section"><div class="section-head"><h2>Dal catalogo</h2><a class="btn alt small" data-nav href="/catalogo">Vedi tutti →</a></div><div class="grid">'+(books.length?books.slice(0,3).map(bookCard).join(''):emptyVerified('featured'))+'</div></section>'
   +'<section class="section"><div class="card"><h2>La biblioteca e LUMEN</h2><p>'+t(libraryCopy.context)+'</p><p>LUMEN è il punto di accesso digitale ai servizi bibliotecari: non sostituisce i sistemi gestionali della biblioteca e mantiene separati gli esiti delle integrazioni esterne.</p><p class="fine">Sedi, orari, contatti e condizioni di prestito saranno indicati dalla biblioteca prima della pubblicazione ufficiale.</p></div></section>'
   +creditsBand();
 }
@@ -241,7 +257,7 @@ async function catalog(){
   const q=new URLSearchParams(location.search).get('q')||'';
   const books=await api('/api/books?q='+encodeURIComponent(q));
   return sectionTitle('Catalogo','Trova un volume per titolo, autore, ISBN o soggetto.')
-  +formSearch(q)+'<section class="section"><div class="section-head"><h2>'+books.length+' titoli'+(q?' per “'+t(q)+'”':'')+'</h2></div><div class="grid">'+(books.length?books.map(bookCard).join(''):empty('Nessun titolo trovato. Prova una ricerca diversa.'))+'</div>'+(books.length===120?'<p class="fine">Vengono mostrati i primi 120 risultati.</p>':'')+'</section>';
+  +formSearch(q)+'<section class="section"><div class="section-head"><h2>'+books.length+' titoli'+(q?' per “'+t(q)+'”':'')+'</h2></div><div class="grid">'+(books.length?books.map(bookCard).join(''):emptyVerified('catalog',!!q))+'</div>'+(books.length===120?'<p class="fine">Vengono mostrati i primi 120 risultati.</p>':'')+'</section>';
 }
 async function bookDetail(){
   const id=location.pathname.split('/')[2];
@@ -260,20 +276,20 @@ async function myLibrary(){
   +'<div class="section"><a class="fine" data-nav href="/catalogo">← Cerca altri titoli</a></div>'
   +((state.koha||state.kohaWrite||state.kohaLoans)?taskHub('Servizi collegati'):'')
   +'<div class="grid section metric-strip"><div class="card"><p class="label">Prestiti attivi</p><p class="metric">'+active.length+'</p></div><div class="card"><p class="label">Prenotazioni aperte</p><p class="metric">'+pending.length+'</p></div><div class="card"><p class="label">Prossima scadenza</p><p class="metric metric-date">'+(active.length?humanDate(active.map(l=>l.due_at).sort()[0]):'Nessuna')+'</p></div></div>'
-  +'<section class="section"><h2>Prestiti</h2><div class="list">'+(loans.length?loans.map(l=>'<article class="card row space"><div><h3>'+t(l.title)+'</h3><p class="fine">Scadenza '+humanDate(l.due_at)+' · '+t(l.barcode)+'</p>'+badge(projectLocalLoan(l).label,l.status==='active'?'':'gray')+'</div>'+(projectLocalLoan(l).action.enabled?btn(projectLocalLoan(l).action.label,'renew',l.id,'alt'):'')+'</article>').join(''):empty('Non hai ancora prestiti.'))+'</div></section>'
-  +'<section class="section"><h2>Prenotazioni</h2><div class="list">'+(holds.length?holds.map(h=>'<article class="card row space"><div><h3>'+t(h.title)+'</h3><p class="fine">Richiesta '+humanDate(h.created_at)+'</p>'+badge(projectLocalHold(h).label,h.status==='queued'?'warn':h.status==='cancelled'?'gray':'')+'</div>'+(projectLocalHold(h).action.enabled?btn(projectLocalHold(h).action.label,'cancel-hold',h.id,'ghost'):'')+'</article>').join(''):empty('Nessuna prenotazione.'))+'</div></section>';
+  +'<section class="section"><h2>Prestiti</h2><div class="list">'+(loans.length?loans.map(l=>'<article class="card row space"><div><h3>'+t(l.title)+'</h3><p class="fine">Scadenza '+humanDate(l.due_at)+' · '+t(l.barcode)+'</p>'+badge(projectLocalLoan(l).label,l.status==='active'?'':'gray')+'</div>'+(projectLocalLoan(l).action.enabled?btn(projectLocalLoan(l).action.label,'renew',l.id,'alt'):'')+'</article>').join(''):emptyVerified('loans'))+'</div></section>'
+  +'<section class="section"><h2>Prenotazioni</h2><div class="list">'+(holds.length?holds.map(h=>'<article class="card row space"><div><h3>'+t(h.title)+'</h3><p class="fine">Richiesta '+humanDate(h.created_at)+'</p>'+badge(projectLocalHold(h).label,h.status==='queued'?'warn':h.status==='cancelled'?'gray':'')+'</div>'+(projectLocalHold(h).action.enabled?btn(projectLocalHold(h).action.label,'cancel-hold',h.id,'ghost'):'')+'</article>').join(''):emptyVerified('holds'))+'</div></section>';
 }
 async function suggestions(){
   if(!isFaculty()) return forbidden();
   const rows=await api('/api/suggestions');
   return sectionTitle('Proposte d’acquisto','Suggerisci un titolo utile per didattica e ricerca.')
   +'<div class="layout section"><div class="card"><h2>Nuova richiesta</h2><form class="form" data-form="suggest">'+field('Titolo','title','Titolo del libro')+field('Autore','author','Autore o curatore')+field('ISBN','isbn','Facoltativo',false)+'<label>Motivazione didattica o di ricerca<textarea name="reason" required maxlength="500" placeholder="Perché la biblioteca dovrebbe acquisirlo?"></textarea></label><button class="btn" type="submit">Invia proposta</button></form></div>'
-  +'<div><h2>Le mie proposte</h2><div class="list">'+(rows.length?rows.map(r=>'<article class="card"><h3>'+t(r.title)+'</h3><p class="fine">'+t(r.author)+' · '+humanDate(r.created_at)+'</p>'+badge(projectAcquisition(r).label,r.status==='rejected'?'warn':'')+'<p class="fine">'+t(projectAcquisition(r).helper)+'</p></article>').join(''):empty('Ancora nessuna proposta.'))+'</div></div></div>';
+  +'<div><h2>Le mie proposte</h2><div class="list">'+(rows.length?rows.map(r=>'<article class="card"><h3>'+t(r.title)+'</h3><p class="fine">'+t(r.author)+' · '+humanDate(r.created_at)+'</p>'+badge(projectAcquisition(r).label,r.status==='rejected'?'warn':'')+'<p class="fine">'+t(projectAcquisition(r).helper)+'</p></article>').join(''):emptyVerified('proposals'))+'</div></div></div>';
 }
 async function notifications(){
   const rows=await api('/api/notifications');
   return sectionTitle('Comunicazioni','Aggiornamenti su prestiti, richieste e servizi della biblioteca.')
-  +'<div class="list section">'+(rows.length?rows.map(n=>'<article class="card row space"><div><h3>'+t(n.title)+'</h3><p>'+t(n.body)+'</p><p class="fine">'+humanDate(n.created_at)+' · '+t(projectNotification(n).label)+'</p></div>'+(projectNotification(n).action.enabled?btn(projectNotification(n).action.label,'read',n.id,'alt'):'')+'</article>').join(''):empty('Non hai notifiche.'))+'</div>';
+  +'<div class="list section">'+(rows.length?rows.map(n=>'<article class="card row space"><div><h3>'+t(n.title)+'</h3><p>'+t(n.body)+'</p><p class="fine">'+humanDate(n.created_at)+' · '+t(projectNotification(n).label)+'</p></div>'+(projectNotification(n).action.enabled?btn(projectNotification(n).action.label,'read',n.id,'alt'):'')+'</article>').join(''):emptyVerified('inbox'))+'</div>';
 }
 async function staff(){
   if(!isStaff())return forbidden();
