@@ -71,3 +71,8 @@ The read-only smoke checks HTTPS, health and DB connectivity, PWA manifest, home
 ### Remote canary data boundary
 
 `npm run verify:remote` performs GETs only and never sends user credentials. Use a public HTTPS origin without a path, query or embedded password. For deterministic CI, an isolated local HTTP fixture checks the expected-SHA comparator, but only a **real Render deployment** can satisfy gate C6. Confirm state persistence by adding a harmless test catalogue item as staff, restarting the service, and observing the same item (without exposing demo users or secrets).
+
+
+### R10 extra recovery acceptance
+
+The portable recovery evidence check is `npm run verify:recovery -- /path/to/backup.sqlite` using both snapshot and manifest. Verify the file after an approved offsite export and **before** staging restore; no production restore is done by this tool. RTO/RPO evidence and recovery of a live Render deployment are still BLOCKED. Full procedure: [R10_RECOVERY.md](R10_RECOVERY.md).

@@ -44,3 +44,8 @@ A Render persistent disk cannot be mounted on multiple instances and prevents ze
 ## After-deploy read-only canary
 
 Run `EXPECTED_SHA=$(git rev-parse HEAD) npm run verify:remote -- https://your-service.onrender.com` from the revision deployed to Render. Requires a real Render HTTPS service; it checks `/api/health`, `/api/version`, PWA manifest and landing page, with strict SHA match.
+
+
+## R10 non-destructive recovery gate
+
+Before touching production, export the online backup and manifest to an independent, approved offsite location; run `npm run verify:recovery -- /path/to/backup.sqlite` on a copy. A green local gate does **not** close recovery: stage the database on an isolated instance, restart, verify records and time the exercise. Avoid reusing a destination backup filename; existing snapshots are now protected against silent overwrite. See [R10_RECOVERY.md](R10_RECOVERY.md).
