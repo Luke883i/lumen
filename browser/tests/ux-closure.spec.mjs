@@ -5,6 +5,8 @@ async function authenticate(page,role){
  await page.locator('input[name="email"]').fill(accounts[role]);
  await page.locator('input[name="password"]').fill('Demo1234!');
  await page.locator('form[data-form="login"] button[type="submit"]').click();
+ // Never navigate away while the asynchronous login/cookie write is pending.
+ await expect(page).toHaveURL(role==='librarian'?/\/staff$/:/\/me$/);
  await expect(page.getByRole('main')).toBeVisible();
  await page.goto('/');
 }
