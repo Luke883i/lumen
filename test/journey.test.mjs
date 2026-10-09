@@ -37,3 +37,10 @@ test('offline state prevents a CTA from implying a working backend operation',()
   assert.match(x.detail,/torna online/);
  }
 });
+
+test('unknown network connectivity does not imply live Koha availability',()=>{
+ const p=nextJourney({role:'student',authenticated:true,source:'koha',koha:true,online:null});
+ assert.equal(p.provenance,'lumen.navigation_only');
+ assert.equal(p.href,'/me');
+ assert.notEqual(p.epistemicStatus,'supported');
+});

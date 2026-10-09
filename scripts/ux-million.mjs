@@ -33,7 +33,7 @@ function checkJourney(result,vector){
  const [role,auth,source,koha,net]=vector;
  const known=auth===true&&['student','faculty','librarian'].includes(role);
  const r=known?role:'guest';
- const offline=net===false,external=!offline&&source==='koha'&&koha===true;
+ const offline=net===false,external=net===true&&source==='koha'&&koha===true;
  return result.role===r&&result.href===(offline?null:external?'/koha':paths[r])&&
    result.enabled===!offline&&result.epistemicStatus===(offline?'blocked':'conditional')&&
    result.provenance===(external?'koha.navigation_only':'lumen.navigation_only')&&
