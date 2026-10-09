@@ -127,3 +127,25 @@ misto di 2.000 concorrenti con resilienza/HA.
 [Tracciabilità source/UX](docs/UX_PROJECTIONS.md) ·
 [Operazioni](docs/OPERATIONS.md) ·
 [Security audit](docs/SECURITY_BIME.md).
+
+## Informazioni, condizioni d'uso e software open source
+
+Sono disponibili per tutti, anche prima dell'accesso, tre pagine distinte:
+`/informazioni` (biblioteca e documenti istituzionali), `/condizioni`
+(cosa fanno realmente prestiti, richieste e notifiche) e `/opensource`
+(licenza del codice originale LUMEN, librerie effettive e crediti).
+
+Prima del lancio pubblico la biblioteca configura i collegamenti HTTPS alle
+proprie condizioni, privacy, accessibilità e assistenza con le variabili
+`LUMEN_INSTITUTION_NAME`, `LUMEN_SERVICE_TERMS_URL`,
+`LUMEN_PRIVACY_URL`, `LUMEN_ACCESSIBILITY_URL` e
+`LUMEN_SUPPORT_URL`. Un dato mancante è dichiarato come **non configurato**,
+non sostituito con regole o informative inventate. La licenza software MIT
+non disciplina i prestiti e non costituisce consenso o informativa GDPR.
+Dettagli: [Information Hub](docs/INFORMATION_HUB.md).
+
+Il [visual audit](docs/VISUAL_RUNTIME_AUDIT.md) cattura screenshot **reali
+headless Chromium** per ospite/studente/docente/bibliotecario nelle CI
+desktop e Android emulato, con misure e provenienza dei dati al Git SHA.
+Un test su browser emulato non dimostra installazione Android fisica,
+consegna push, Render reale o 2.000 utenti concorrenti.

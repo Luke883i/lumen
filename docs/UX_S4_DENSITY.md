@@ -35,3 +35,7 @@ Fail if any normal-scale budget is breached, a long title is truncated, a primar
 ## Operator commands
 
 Codespaces: `npm run dev` -> forwarded port 3000. Optional visual tests: `npm --prefix browser ci`, `npm --prefix browser exec -- playwright install chromium`, `npm run test:browser`. Render retains `npm start` and existing deploy preflight.
+
+### Institutional information compactness
+
+Legal/compliance information appears as a small `/informazioni` link in global footer and a compact two-column information index on desktop, one column on narrow mobile. It reuses existing card, typography, spacing, color and focus tokens. No oversized ornamental graphic is introduced. The cross-role screenshot audit in `browser/tests/role-audit.spec.mjs` validates 1 H1, overflow, hero budgets and CTA naming; real screenshots are attached to test results for visual review.
