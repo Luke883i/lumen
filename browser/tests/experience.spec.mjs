@@ -429,7 +429,8 @@ test('guest sees truthful open-source attribution and can read usage/license lin
  await expect(page).toHaveURL(/\/opensource$/);
  await expect(page.getByRole('heading',{name:'Open source e riconoscimenti'})).toBeVisible();
  await expect(page.getByRole('link',{name:'Licenza LUMEN (MIT)'})).toHaveAttribute('href',/\/LICENSE$/);
- await expect(page.getByRole('link',{name:'Condizioni di utilizzo e responsabilità'})).toHaveAttribute('href',/USAGE_TERMS\.md$/);
+ await expect(page.getByRole('link',{name:'Responsabilità di utilizzo del software'})).toHaveAttribute('href',/USAGE_TERMS\.md$/);
+ await expect(page.getByRole('link',{name:'Condizioni del servizio bibliotecario'})).toHaveAttribute('href','/condizioni');
  await expect(page.getByRole('link',{name:'Licenza Koha (GPL-3.0+)'})).toHaveAttribute('href',/Koha\/blob\/main\/LICENSE$/);
  await expect(page.getByRole('main')).toContainText('FOLIO, Evergreen, SLiMS e Invenio ILS');
 });

@@ -161,7 +161,7 @@ function header(){
     +'<nav class="nav" aria-label="Navigazione principale">'+primaryDesktop+more+account+'</nav></header>'
     +'<nav class="bottom-nav" aria-label="Navigazione mobile">'+bottom+'</nav>';
 }
-function footer(){return '<footer class="shell footer"><div class="row"><span><strong>LUMEN</strong> · Il tuo spazio per la conoscenza</span><span>Servizi bibliotecari · <a data-nav href="/informazioni">Informazioni e condizioni</a> · <a data-nav href="/opensource">Open source</a> · <a data-nav href="/installazione">Installa app</a> · <a data-nav href="/impostazioni">Impostazioni</a></span></div></footer>';}
+function footer(){return '<footer class="shell footer"><div class="row"><span><strong>LUMEN</strong> · Il tuo spazio per la conoscenza</span><span>Servizi bibliotecari · <a data-nav href="/informazioni">Informazioni</a> · <a data-nav href="/condizioni">Condizioni d’uso</a> · <a data-nav href="/opensource">Open source</a> · <a data-nav href="/installazione">Installa app</a> · <a data-nav href="/impostazioni">Impostazioni</a></span></div></footer>';}
 function externalCredit(href,label){
  return '<a href="'+esc(href)+'" target="_blank" rel="noopener noreferrer">'+t(label)+'</a>';
 }
