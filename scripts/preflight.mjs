@@ -3,22 +3,27 @@ import {DatabaseSync} from 'node:sqlite';
 import {existsSync,readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {evaluateDeployment} from '../src/deployment-contract.mjs';
 const repo=resolve(fileURLToPath(new URL('../',import.meta.url)));
 const prod=process.env.NODE_ENV==='production';
 const checks=[];
 const record=(name,ok,detail)=>checks.push({name,status:ok?'PASS':'FAIL',detail});
 const has=p=>existsSync(resolve(repo,p));
-record('node-24',process.versions.node.split('.')[0]==='24','Codespaces and CI pin Node 24');
-record('npm-lock',has('package-lock.json'),'Dependency graph is reproducible via npm ci');
-record('manifest-and-icons',['public/manifest.webmanifest','public/icons/icon-192.png','public/icons/icon-512.png','public/sw.js'].every(has),'Installable application assets');
-record('deploy-blueprint',has('render.yaml'),'Render single-instance persistent disk blueprint');
-record('devcontainer',has('.devcontainer/devcontainer.json'),'Codespaces base image and bootstrap');
-record('explicit-demo',!prod || process.env.LUMEN_DEMO!=='1','Production cannot enable demo');
-if(prod){
-  const path=process.env.LUMEN_DB_PATH||'';
-  record('persistent-database-path',path.startsWith('/var/data/')||path.startsWith('/mnt/'),'Production SQLite must live on a persistent disk');
-  record('admin-first-start',!!process.env.ADMIN_EMAIL&&!!process.env.ADMIN_PASSWORD&&process.env.ADMIN_PASSWORD.length>=12,'First-start administrative credentials are configured');
+// Determine whether credentials are needed from *actual local state*, not
+// deployment platform. Existing valid accounts survive credential removal.
+const dbPath=process.env.LUMEN_DB_PATH;
+let firstRun=true;
+if(prod&&dbPath&&existsSync(dbPath)){
+  try{
+    const existing=new DatabaseSync(dbPath,{readOnly:true});
+    try{firstRun=existing.prepare('SELECT count(*) AS n FROM users').get().n===0;}
+    finally{existing.close();}
+  }catch{firstRun=false;} // the existing DB integrity gate below reports failure
 }
+const profile=evaluateDeployment(process.env,{
+  nodeMajor:process.versions.node.split('.')[0],firstRun
+});
+for(const check of profile.checks)record(check.name,check.status==='PASS',check.detail);
 if(process.env.KOHA_CIRCULATION_ENABLED==='1'){
   record('koha-circulation-configuration',
     !!(process.env.KOHA_BASE_URL&&process.env.KOHA_CLIENT_ID&&process.env.KOHA_CLIENT_SECRET&&
