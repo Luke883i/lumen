@@ -33,6 +33,8 @@ The new policy favors correctness over maximum HTTP cache hit rate for **non-fin
 5. **HTTP gate:** check headers, `/installazione` deep link, missing JS `404`, secure content-type behavior.
 6. **Browser gate:** inject an obsolete ES module into the real Chromium CacheStorage, then reload online. The true `experience.js` must load and replace the stale entry.
 7. **UX gate:** simulate `controllerchange` in a previously controlled PWA, assert visible compact refresh CTA; click causes a controlled reload.
+8. **Quota saturation:** valid HTTP data followed by CacheStorage `QuotaExceededError` must still reach the page; only offline availability is degraded. Rejected offline writes cannot turn fresh responses into stale ones.
+9. **HTTP error / reachable-state matrix:** a live HTTP 503 must remain an error and must not poison the offline cache. Execute 80 deterministic combinations of route, method, origin, online/offline and cached/uncached data.
 
 These are local and emulated-browser tests, not an exhaustive proof across all browsers, CDN/proxy variants or OS devices.
 
@@ -43,6 +45,7 @@ These are local and emulated-browser tests, not an exhaustive proof across all b
 - [x] Offline fallback to last verified shell and assets.
 - [x] API and cross-origin traffic excluded from caching.
 - [x] No blanket CacheStorage removal.
+- [x] Under full/disabled browser cache, valid online response still wins. HTTP errors remain errors.
 - [x] No new npm dependencies or domain API mutations.
 
 **Intermediate — acceptance:**

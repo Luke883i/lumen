@@ -6,7 +6,7 @@ import {runInNewContext} from 'node:vm';
 
 const source=readFileSync(new URL('../public/sw.js',import.meta.url),'utf8');
 const host='https://lumen.example';
-function harness({online=true,stored={},initialCaches=[],failCacheWrite=false}={}){
+function harness({online=true,stored={},initialCaches=[],failCacheWrite=false,httpError=false}={}){
   const handlers={},called=[],deleted=[],cacheNames=new Map();
   const makeResponse=label=>({ok:true,label,clone(){return makeResponse(label);}});
   const fullPath=value=>typeof value==='string'?new URL(value,host).pathname:new URL(value.url).pathname;
@@ -31,7 +31,9 @@ function harness({online=true,stored={},initialCaches=[],failCacheWrite=false}={
   const fetch=async(request,options)=>{
     called.push({path:fullPath(request),cache:options?.cache});
     if(!online)throw Error('OFFLINE');
-    return makeResponse('network-'+fullPath(request));
+    const response=makeResponse('network-'+fullPath(request));
+    if(httpError)response.ok=false;
+    return response;
   };
   runInNewContext(source,{self,caches,fetch,URL});
   async function request(path,{method='GET',mode='cors',origin=host}={}){
@@ -95,4 +97,34 @@ test('R15 saturation: quota failure must not downgrade a successful online JS to
  const current=await h.request('/app.js');
  assert.equal(current.label,'network-/app.js');
  assert.equal(h.records.get('/app.js')?.label,'obsolete-app','failed write must not corrupt existing cache');
+});
+
+test('R15 mutation: an online HTTP 503 cannot be disguised as successful offline content',async()=>{
+  const h=harness({stored:{'/app.js':'last-known-good'},httpError:true});
+  const error=await h.request('/app.js');
+  assert.equal(error.ok,false,'HTTP error must remain an error');
+  assert.equal(h.records.get('/app.js').label,'last-known-good','do not poison offline cache with 503');
+});
+test('R15 reachable-state matrix: method, origin, network, path and cached asset cannot create fake success',async()=>{
+  let cases=0;
+  for(const path of ['/app.js','/style.css','/manifest.webmanifest','/catalogo','/api/holds']){
+    for(const method of ['GET','POST']){
+      for(const external of [false,true]){
+        for(const online of [false,true]){
+          for(const cached of [false,true]){
+            const h=harness({online,stored:cached?{'/app.js':'old','/style.css':'old','/manifest.webmanifest':'old','/':'shell'}:{}});
+            const request=()=>h.request(path,{method,origin:external?'https://other.example':'https://lumen.example',
+              mode:path==='/catalogo'?'navigate':'cors'});
+            const bypass=method!=='GET'||external||path.startsWith('/api/');
+            if(bypass)assert.equal(await request(),null,'expected request outside SW authority');
+            else if(online)assert.equal((await request()).label,'network-'+path);
+            else if(cached)assert.equal((await request()).label,path==='/catalogo'?'shell':'old');
+            else await assert.rejects(request,/OFFLINE/);
+            cases++;
+          }
+        }
+      }
+    }
+  }
+  assert.equal(cases,80,'deterministic scoped mutation partitions');
 });
