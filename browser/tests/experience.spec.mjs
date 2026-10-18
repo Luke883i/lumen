@@ -459,3 +459,19 @@ test('R15 real Chromium upgrades a stale cached ES module while online',async({p
   expect(cached).toContain('libraryCopy');
   expect(cached).not.toContain('staleVersion');
 });
+
+
+test('R15 service-worker upgrade prompts before reload instead of discarding active work',async({page})=>{
+  await page.goto('/');
+  await page.evaluate(async()=>navigator.serviceWorker.ready);
+  await page.reload();
+  await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+  // Browser events may occur after a version is published; dispatch one
+  // controlled update without pretending to install a second OS application.
+  await page.evaluate(()=>navigator.serviceWorker.dispatchEvent(new Event('controllerchange')));
+  await expect(page.locator('#update-notice')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Aggiorna LUMEN'})).toBeVisible();
+  await page.getByRole('button',{name:'Aggiorna LUMEN'}).click();
+  await expect(page.locator('#update-notice')).toBeHidden();
+  await expect(page.getByRole('heading',{name:'Ogni libro apre una possibilità.'})).toBeVisible();
+});
