@@ -22,20 +22,25 @@ self.addEventListener('fetch',event=>{
   if(!navigate&&!ASSETS.includes(url.pathname))return;
   const cacheKey=navigate?'/':request;
   event.respondWith((async()=>{
+    let response;
     try{
-      const response=await fetch(request,{cache:'no-store'});
-      if(response.ok && (!navigate||url.pathname==='/')){
-        // Wait for cache write before completing the response promise; this
-        // retains the latest authenticated-independent static shell offline.
-        const cache=await caches.open(CACHE);
-        await cache.put(cacheKey,response.clone());
-      }
-      return response;
+      response=await fetch(request,{cache:'no-store'});
     }catch(error){
+      // A true transport failure permits last-known-good offline content.
       const cached=await caches.match(cacheKey);
       if(cached)return cached;
-      throw error; // No invented successful response when even offline shell is absent.
+      throw error; // Never invent a successful API or missing-shell response.
     }
+    if(response.ok && (!navigate||url.pathname==='/')){
+      try{
+        const cache=await caches.open(CACHE);
+        await cache.put(cacheKey,response.clone());
+      }catch{
+        // Full/disabled browser storage must not turn valid network data into
+        // a stale-cache response. The current HTTP response remains usable.
+      }
+    }
+    return response;
   })());
 });
 const safeTarget=value=>{
