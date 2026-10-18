@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openStore, bootstrap } from './store.mjs';
+import {assertServerEnvironment} from './deployment-contract.mjs';
 import { createService, Failure } from './service.mjs';
 import { makeKoha } from './koha.mjs';
 import { createKohaCirculation } from './koha-circulation.mjs';
@@ -12,6 +13,7 @@ import { createOidc } from './oidc.mjs';
 import {trustedOrigin,registerLoginAttempt} from './security.mjs';
 import {institutionSettings} from './institution.mjs';
 
+assertServerEnvironment(process.env);
 const s=openStore(process.env.LUMEN_DB_PATH || './data/lumen.sqlite');
 bootstrap(s);
 const service=createService(s);

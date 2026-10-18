@@ -17,12 +17,12 @@ export function evaluateDeployment(env={},state={}){
   pass(checks,'node-runtime',nodeMajor==='24','LUMEN requires Node.js 24 (SQLite runtime contract)');
   pass(checks,'port',validPort(env.PORT),'PORT must be 1..65535; omitted defaults to 3000');
   if(prod){
-    pass(checks,'demo-disabled',env.LUMEN_DEMO!=='1','No demonstration accounts in production');
+    pass(checks,'explicit-demo',env.LUMEN_DEMO!=='1','No demonstration accounts in production');
     pass(checks,'database-absolute',typeof path==='string'&&path.length>0&&
-      path!==':memory:'&&isAbsolute(path)&&!path.endsWith(sep),
+      path!==':memory:'&&isAbsolute(path)&&!path.endsWith(sep)&&!/[\u0000-\u001f]/.test(path),
       'Production requires an absolute on-disk SQLite file path');
     if(root!==undefined){
-      pass(checks,'storage-root',typeof root==='string'&&isAbsolute(root)&&
+      pass(checks,'storage-root',typeof root==='string'&&isAbsolute(root)&&!/[\u0000-\u001f]/.test(root)&&
         typeof path==='string'&&isAbsolute(path)&&inside(path,root),
         'SQLite path must be below the optional platform volume root');
     }
