@@ -51,6 +51,17 @@ npm run verify:deploy
 Per i test Chromium desktop/Android emulato consulta
 [browser/README.md](browser/README.md).
 
+## Deployment portabile (R14)
+
+LUMEN ha un solo contratto di runtime: **Node 24 + SQLite persistente su una sola istanza**, indipendente dal vendor. L'avvio di produzione è sempre `npm start`; primo avvio richiede le credenziali amministratore, i riavvii validi no. Render rimane l'adapter pronto via Blueprint, mentre `Dockerfile` consente packaging OCI e Node può essere eseguito su altri host con un volume realmente durevole.
+
+```bash
+npm run deploy:mutations   # 10.000 configurazioni mutate deterministicamente
+npm run verify:portable    # due veri avvii di produzione sullo stesso database
+```
+
+[Contratto universale, requisiti minimi, falsificazioni e limiti](docs/UNIVERSAL_DEPLOYMENT.md).
+
 ## 2. Distribuire su Render
 
 Usa **Render → New → Blueprint** con `main` e il
