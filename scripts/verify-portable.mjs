@@ -46,8 +46,11 @@ async function phase(first){
    await wait(200);
   }
   if(!ready)throw Error('HEALTH_NOT_READY '+stderr.join('').slice(-1000));
+  // HTTPS is terminated by the real deployment proxy. During this local
+  // process test, model the external Origin explicitly without claiming TLS.
   const login=await fetch(origin+'/api/login',{method:'POST',headers:{
-   Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+   Origin:'https://127.0.0.1:'+port,'Content-Type':'application/json'},
+   body:JSON.stringify({email,password})});
   if(login.status!==200)throw Error('BOOTSTRAP_ADMIN_UNAVAILABLE '+login.status);
   const body=await login.json();
   if(body.user.role!=='librarian')throw Error('STAFF_ROLE_MISSING');
