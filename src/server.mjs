@@ -70,7 +70,7 @@ const getPublic=async(path,res)=>{
   let file;
   try {file=await readFile(target);} catch {if(!p.includes('.') && !p.startsWith('/api/')) file=await readFile(resolve(publicDir,'index.html'));else throw new Failure(404,'NOT_FOUND','Risorsa inesistente');}
   const ext=extname(target);
-  res.writeHead(200,{'Content-Type':mime[ext]||'text/html; charset=utf-8','Cache-Control':ext==='.html'||p==='/sw.js'?'no-cache':'public, max-age=3600','X-Content-Type-Options':'nosniff'});
+  res.writeHead(200,{'Content-Type':mime[ext]||'text/html; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'});
   res.end(file);
 };
 
