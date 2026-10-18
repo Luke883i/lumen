@@ -23,7 +23,7 @@ export function evaluateDeployment(env={},state={}){
       'Production requires an absolute on-disk SQLite file path');
     if(root!==undefined){
       pass(checks,'storage-root',typeof root==='string'&&isAbsolute(root)&&!/[\u0000-\u001f]/.test(root)&&
-        typeof path==='string'&&isAbsolute(path)&&inside(path,root),
+        typeof path==='string'&&isAbsolute(path)&&!/[\u0000-\u001f]/.test(path)&&inside(path,root),
         'SQLite path must be below the optional platform volume root');
     }
     const firstRun=state.firstRun!==false;
