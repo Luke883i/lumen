@@ -6,7 +6,7 @@ import {runInNewContext} from 'node:vm';
 
 const source=readFileSync(new URL('../public/sw.js',import.meta.url),'utf8');
 const host='https://lumen.example';
-function harness({online=true,stored={},initialCaches=[]}={}){
+function harness({online=true,stored={},initialCaches=[],failCacheWrite=false}={}){
   const handlers={},called=[],deleted=[],cacheNames=new Map();
   const makeResponse=label=>({ok:true,label,clone(){return makeResponse(label);}});
   const fullPath=value=>typeof value==='string'?new URL(value,host).pathname:new URL(value.url).pathname;
@@ -14,7 +14,7 @@ function harness({online=true,stored={},initialCaches=[]}={}){
   for(const name of initialCaches)cacheNames.set(name,new Map());
   const bucket={
     async match(request){return records.get(fullPath(request));},
-    async put(request,response){records.set(fullPath(request),response);},
+    async put(request,response){if(failCacheWrite)throw Error('QUOTA_EXCEEDED');records.set(fullPath(request),response);},
     async addAll(paths){for(const x of paths)records.set(fullPath(x),makeResponse('precached'));}
   };
   const caches={
@@ -88,4 +88,11 @@ test('R15 mutation: no unproven online resource response is cached',async()=>{
  assert.equal(normal.label,'network-/app.js');
  const previous=h.records.get('/app.js');
  assert.equal(previous.label,'network-/app.js');
+});
+
+test('R15 saturation: quota failure must not downgrade a successful online JS to stale cache',async()=>{
+ const h=harness({online:true,stored:{'/app.js':'obsolete-app'},failCacheWrite:true});
+ const current=await h.request('/app.js');
+ assert.equal(current.label,'network-/app.js');
+ assert.equal(h.records.get('/app.js')?.label,'obsolete-app','failed write must not corrupt existing cache');
 });
