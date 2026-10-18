@@ -60,7 +60,7 @@ function expected(c){
     if(!absolute)errors.push('database-absolute');
     if(e.LUMEN_STORAGE_ROOT!==undefined){
       const mount=e.LUMEN_STORAGE_ROOT;
-      if(typeof mount!=='string'||mount[0]!=='/'||
+      if(typeof mount!=='string'||!mount||mount[0]!=='/'||
         /[\x00-\x1f]/.test(mount)||!absolute||
         !(path.startsWith(mount.replace(/\/+$/,'')+'/')))
         errors.push('storage-root');
