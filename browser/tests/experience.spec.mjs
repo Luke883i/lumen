@@ -434,3 +434,44 @@ test('guest sees truthful open-source attribution and can read usage/license lin
  await expect(page.getByRole('link',{name:'Licenza Koha (GPL-3.0+)'})).toHaveAttribute('href',/Koha\/blob\/main\/LICENSE$/);
  await expect(page.getByRole('main')).toContainText('FOLIO, Evergreen, SLiMS e Invenio ILS');
 });
+
+
+test('R15 real Chromium upgrades a stale cached ES module while online',async({page})=>{
+  await page.goto('/');
+  await page.evaluate(async()=>navigator.serviceWorker.ready);
+  await page.reload();
+  await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+  const cacheName='lumen-static-v10';
+  await page.evaluate(async cacheName=>{
+    const cache=await caches.open(cacheName);
+    await cache.put('/experience.js',new Response('export const staleVersion = true;',{
+      headers:{'Content-Type':'text/javascript'}
+    }));
+  },cacheName);
+  // An older cache-first SW would now serve the obsolete module, breaking
+  // app imports. The real LUMEN module must win despite identical URL.
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'Ogni libro apre una possibilità.'})).toBeVisible();
+  const cached=await page.evaluate(async cacheName=>{
+    const cache=await caches.open(cacheName);
+    return (await (await cache.match('/experience.js')).text());
+  },cacheName);
+  expect(cached).toContain('libraryCopy');
+  expect(cached).not.toContain('staleVersion');
+});
+
+
+test('R15 service-worker upgrade prompts before reload instead of discarding active work',async({page})=>{
+  await page.goto('/');
+  await page.evaluate(async()=>navigator.serviceWorker.ready);
+  await page.reload();
+  await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+  // Browser events may occur after a version is published; dispatch one
+  // controlled update without pretending to install a second OS application.
+  await page.evaluate(()=>navigator.serviceWorker.dispatchEvent(new Event('controllerchange')));
+  await expect(page.locator('#update-notice')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Aggiorna LUMEN'})).toBeVisible();
+  await page.getByRole('button',{name:'Aggiorna LUMEN'}).click();
+  await expect(page.locator('#update-notice')).toBeHidden();
+  await expect(page.getByRole('heading',{name:'Ogni libro apre una possibilità.'})).toBeVisible();
+});

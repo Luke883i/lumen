@@ -49,3 +49,7 @@ Run `EXPECTED_SHA=$(git rev-parse HEAD) npm run verify:remote -- https://your-se
 ## R10 non-destructive recovery gate
 
 Before touching production, export the online backup and manifest to an independent, approved offsite location; run `npm run verify:recovery -- /path/to/backup.sqlite` on a copy. A green local gate does **not** close recovery: stage the database on an isolated instance, restart, verify records and time the exercise. Avoid reusing a destination backup filename; existing snapshots are now protected against silent overwrite. See [R10_RECOVERY.md](R10_RECOVERY.md).
+
+## Installed PWA release updates (R15)
+
+New deployments must reach clients with existing browser installations. Stable JS/CSS/manifest URLs use online network-first with an offline fallback; a worker-controller change displays **Aggiorna LUMEN**, and reload occurs only after the user acts. Do not instruct users to clear browser data, delete an offline inbox or repeat uncertain circulation mutations as a generic remedy for cache issues. Operator acceptance and limits are in [R15_CACHE_COHERENCE.md](R15_CACHE_COHERENCE.md).

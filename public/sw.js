@@ -1,29 +1,47 @@
 // LUMEN offline shell and privacy-safe system notifications.
-const CACHE='lumen-static-v9';
+const CACHE='lumen-static-v10';
+const CACHE_PREFIX='lumen-static-';
 const ASSETS=['/','/style.css','/app.js','/experience.js','/interaction.js','/notification-watch.js','/projections.js','/navigation.js','/journey.js','/empty-state.js','/credits.js','/legal.js','/manifest.webmanifest',
   '/icons/lumen.svg','/icons/icon-192.png','/icons/icon-512.png'];
 self.addEventListener('install',event=>event.waitUntil(
   caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())
 ));
 self.addEventListener('activate',event=>event.waitUntil(
-  caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())
+  caches.keys().then(keys=>Promise.all(
+    keys.filter(k=>k.startsWith(CACHE_PREFIX)&&k!==CACHE).map(k=>caches.delete(k))
+  )).then(()=>self.clients.claim())
 ));
+// Immutable URLs must be content-addressed. LUMEN uses stable /app.js and
+// /style.css routes, so cache-first would serve an obsolete deployment forever
+// if a subsequent commit didn't also edit sw.js. Prefer actual network truth,
+// bypass browser HTTP caches, then retain verified assets for offline use.
 self.addEventListener('fetch',event=>{
   const request=event.request,url=new URL(request.url);
   if(request.method!=='GET'||url.origin!==self.location.origin||url.pathname.startsWith('/api/'))return;
-  if(request.mode==='navigate'){
-    event.respondWith(fetch(request).then(response=>{
-      if(response.ok&&url.pathname==='/'){const clone=response.clone();event.waitUntil(caches.open(CACHE).then(c=>c.put('/',clone)));}
-      return response;
-    }).catch(()=>caches.match('/')));
-    return;
-  }
-  if(ASSETS.includes(url.pathname)){
-    event.respondWith(caches.match(request).then(cached=>cached||fetch(request).then(response=>{
-      if(response.ok){const clone=response.clone();event.waitUntil(caches.open(CACHE).then(c=>c.put(request,clone)));}
-      return response;
-    })));
-  }
+  const navigate=request.mode==='navigate';
+  if(!navigate&&!ASSETS.includes(url.pathname))return;
+  const cacheKey=navigate?'/':request;
+  event.respondWith((async()=>{
+    let response;
+    try{
+      response=await fetch(request,{cache:'no-store'});
+    }catch(error){
+      // A true transport failure permits last-known-good offline content.
+      const cached=await caches.match(cacheKey);
+      if(cached)return cached;
+      throw error; // Never invent a successful API or missing-shell response.
+    }
+    if(response.ok && (!navigate||url.pathname==='/')){
+      try{
+        const cache=await caches.open(CACHE);
+        await cache.put(cacheKey,response.clone());
+      }catch{
+        // Full/disabled browser storage must not turn valid network data into
+        // a stale-cache response. The current HTTP response remains usable.
+      }
+    }
+    return response;
+  })());
 });
 const safeTarget=value=>{
   if(typeof value!=='string'||!/^\/(notifiche|me|catalogo)(\/|$)/.test(value)||value.startsWith('//'))return '/notifiche';
