@@ -43,6 +43,10 @@ jobs:
         run: |
           { echo '### Domain CI test assertions · ${{ github.sha }}'; echo '~~~text'; tail -n 180 /tmp/lumen-test.log 2>/dev/null || true; echo '~~~'; } > /tmp/lumen-r9b-errors.md
           gh pr comment "$PR_NUMBER" --body-file /tmp/lumen-r9b-errors.md
+      - name: 10k seeded deployment configurations
+        run: npm run deploy:mutations
+      - name: Production bootstrap and restart on a generic volume
+        run: npm run verify:portable
       - name: Render release contract
         run: npm run verify:deploy
       - name: Clean Codespaces and npm start runtime journeys
