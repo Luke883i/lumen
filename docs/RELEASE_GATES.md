@@ -128,3 +128,7 @@ Routes `/informazioni` / `/condizioni` / `/opensource` separate institution-owne
 ## R10 — Recoverability verification (PR #22)
 
 An independent read-only verifier copies a SQLite snapshot to an isolated temporary location and enforces bounded manifest v1 parsing, byte size/SHA-256, PRAGMA integrity_check, foreign_key_check, required LUMEN tables and circulation indexes. A backup writer cannot overwrite an existing snapshot/manifest. The CLI returns machine-readable PASS/FAIL, without private catalogue/patron payloads. Negative tests cover orphan rows, wrong schema, bytes, manifest, symlink, and source-after-snapshot mutation. This is a **local CI proof**, not evidence of a real Render deployment or offsite storage/restore, and an unkeyed SHA manifest is not a signature. See [R10_RECOVERY.md](R10_RECOVERY.md).
+
+## R15 — PWA update and cache isolation
+
+Stale JS/CSS/manifest on existing installed PWAs, uncontrolled CacheStorage deletion and one-hour HTTP cache policy were discovered in main. R15 introduces network-first nonfingerprinted PWA resources, offline verified fallback, scoped activation cleanup, no-cache HTTP asset headers, and user-controlled refresh on worker update. Unit, HTTP and real Chromium mutation gates are required on the **exact SHA**, while physical OS installation/notifications, real Render/Koha/IdP and enterprise capacity remain BLOCKED. See [R15_CACHE_COHERENCE.md](R15_CACHE_COHERENCE.md).
