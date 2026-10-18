@@ -113,3 +113,14 @@ test('institutional information and legal routes are anonymous SPA pages',async(
  for(const field of ['VAPID_PRIVATE_KEY','OIDC_CLIENT_SECRET','ADMIN_PASSWORD'])
   assert.equal(JSON.stringify(payload).includes(field),false);
 });
+
+test('R15 immutable-URL illusion: HTML, script, CSS, icons and SW must require revalidation',async()=>{
+  for(const path of ['/','/app.js','/style.css','/manifest.webmanifest','/sw.js','/icons/icon-192.png','/installazione']){
+    const response=await fetch(host+path);
+    assert.equal(response.status,200,path);
+    assert.equal(response.headers.get('cache-control'),'no-cache',path);
+    assert.equal(response.headers.get('x-content-type-options'),'nosniff',path);
+  }
+  const notFound=await fetch(host+'/missing-does-not-exist.js');
+  assert.equal(notFound.status,404,'missing JS is not an HTML success');
+});
