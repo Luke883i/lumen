@@ -3,7 +3,7 @@
 
 ## Independent entrypoint
 
-**Purpose:** an essential standalone library-service webapp for catalogues, requests, loans, librarian work and optional institutional integrations. Codespaces and a single-instance pilot are its practical entrypoints; availability, Koha/SSO production integration, legal notices and physical usability are separate external gates. **Provisional CORA-Score:** Dev_CORA **4/5** · Bonifica_CORA **2/5**; [rubric](https://github.com/Luke883i/cora/blob/main/docs/CORA_SCORE.md).
+**Purpose:** an essential standalone library-service webapp for catalogues, requests, loans, librarian work and optional institutional integrations. Codespaces and a single-instance pilot are its practical entrypoints; availability, Koha/SSO production integration, legal notices and physical usability are separate external gates. **Provisional CORA-Score:** Dev_CORA **4/5** · Bonifica_CORA **2/5**; [rubric](https://github.com/Luke883i/cora#cora-score--indicative-assurance-bands-not-a-product-certification).
 
 ---
 
