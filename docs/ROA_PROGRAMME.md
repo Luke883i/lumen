@@ -14,18 +14,12 @@ The affiliation is a *coordination, discoverability and portfolio topology* stat
 - **Not a dependency:** neither repository needs to clone/import/deploy the other; no bibliographic-data flow exists from LUMEN into ROA.
 - **Change protocol:** do not hardcode deployment status, Git SHA, performance numbers, institutional names or test-pass counters into programme membership. Release facts must be verified at the relevant LUMEN commit.
 
-## Header compatibility
+## Canonical public header — v2
 
-Use `roa-programme-header:v1`, exactly as defined by the [canonical membership header](https://github.com/Luke883i/academics/blob/main/PROGRAMME_HEADER_CONTRACT.md):
+The README opens with one exact `<!-- programme-header:v2 -->` shared identity, pointing directly to academics, ROA and CORA. It replaces the old programme badges and `roa-programme-header:v1` marker, which are historical rather than current requirements. LUMEN remains a `LIBRARY_SERVICES_VERTICAL` / `APPLIED_SURFACE` in programme topology, **not** a derived ROA implementation.
 
-```text
-hub=Luke883i/academics
-framework=Luke883i/ROA
-role=LIBRARY_SERVICES_VERTICAL
-```
-
-The two Markdown badges and accompanying scope paragraph in [README.md](../README.md) are the only programme-specific changes to the user-facing repository entrypoint. **The installable LUMEN application is unchanged**; its informational pages, library branding and product permissions do not gain any artificial ROA authority.
+The text must preserve that programme membership does not imply shared runtime, formal derivation, scientific validation, certification or production readiness, and that LUMEN-local code and evidence remain authoritative.
 
 ## Test boundary
 
-`test/roa-membership.test.mjs` checks the immutable v1 header syntax, canonical links, role and anti-entailment text. It cannot prove that the academics PR has been merged or that any research claim is true. Cross-repository reconciliation is a separate academics change.
+`test/roa-membership.test.mjs` checks the current v2 header and adversarial violations of its local authority and cross-references. It does not prove cross-repository CI policy enforcement or the product's real deployment and user acceptance.
