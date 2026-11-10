@@ -23,7 +23,7 @@ function verifyHeader(source){
 test('canonical public v2 header is exact-once, first and cross-referenced',()=>{
   assert.equal(verifyHeader(text),true);
   assert.ok(text.indexOf(marker)<text.indexOf('# LUMEN'));
-  assert.equal(text.includes('LIBRARY_SERVICES_VERTICAL'),true);
+  assert.equal(link.includes('LIBRARY_SERVICES_VERTICAL'),true);
 });
 test('programme affiliation does not launder local runtime into scientific or enterprise proof',()=>{
   for(const value of clauses) assert.ok(text.includes(value),value);
