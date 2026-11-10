@@ -1,0 +1,23 @@
+name: Programme README identity
+on:
+  pull_request:
+    paths: ['README.md', '.github/workflows/programme-readme.yml']
+  push:
+    branches: [main]
+    paths: ['README.md', '.github/workflows/programme-readme.yml']
+permissions:
+  contents: read
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python - <<'PY'
+          from pathlib import Path
+          r=Path('README.md').read_text()
+          assert r.startswith('<!-- programme-header:v2 -->')
+          assert r.count('<!-- programme-header:v2 -->')==1
+          for x in ('Luke883i/academics','Luke883i/ROA','Luke883i/cora','Repository-local code'):
+              assert x in r[:800],x
+          PY
